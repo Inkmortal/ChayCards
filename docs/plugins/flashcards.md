@@ -1,88 +1,162 @@
-# Flashcards Plugin Documentation
+# Flashcard Plugin Documentation
 
 ## Overview
 
-The flashcards plugin implements a spaced repetition flashcard system. It serves as a reference implementation demonstrating how to create full-featured plugins in ChayCards.
+The flashcard plugin implements a spaced repetition system for memorizing information using the SuperMemo SM-2 algorithm. The plugin is structured into several modules for better maintainability and separation of concerns.
 
-## Components
+## File Structure
 
-### Document Type (`types.ts`)
-
-```typescript
-// Example structure of a flashcard document
-interface Flashcard extends BaseDocument {
-  type: 'flashcard';
-  front: string;         // Question/prompt side
-  back: string;          // Answer side
-  metadata: {
-    lastReviewed?: Date;
-    nextReview?: Date;
-    difficulty?: number;
-    streak?: number;
-  }
-}
+```
+src/plugins/flashcards/
+├── components/              # UI Components
+│   ├── FlashcardEditor.tsx # Card creation/editing interface
+│   └── FlashcardViewer.tsx # Review interface
+├── plugin.ts               # Main plugin implementation
+├── repository.ts           # Database operations
+├── review-service.ts       # Spaced repetition logic
+├── schema.ts              # Database schema definition
+└── types.ts               # Type definitions
 ```
 
-### Repository (`repository.ts`)
+## Modules
 
-The repository handles:
+### Plugin (plugin.ts)
+The main plugin implementation that ties everything together:
+- Implements `DocumentTypePlugin` interface
+- Manages document lifecycle (CRUD operations)
+- Integrates UI components and services
+
+### Schema (schema.ts)
+Defines the database structure:
+- Tables: flashcards, decks, templates, review_history
+- Indexes for performance optimization
+- Initial data (default templates and decks)
+
+### Review Service (review-service.ts)
+Implements spaced repetition algorithm:
+- Review processing
+- Interval calculations
+- Performance tracking
+- Due card retrieval
+
+### Components
+#### FlashcardEditor (components/FlashcardEditor.tsx)
+UI for creating and editing flashcards:
+- Template selection
+- Field editing
+- Tag management
+- Deck assignment
+
+#### FlashcardViewer (components/FlashcardViewer.tsx)
+UI for reviewing flashcards:
+- Front/back card display
+- Review controls
+- Performance rating
+- Progress tracking
+
+### Repository (repository.ts)
+Handles database operations:
 - CRUD operations for flashcards
-- Spaced repetition algorithm implementation
-- Review scheduling and statistics
-- Batch operations for deck management
+- Review history tracking
+- Due card queries
 
-### Plugin Implementation (`plugin.ts`)
+### Types (types.ts)
+Type definitions:
+- Document interfaces
+- Template structures
+- Review data types
 
-Responsibilities:
-1. Registers flashcard document type
-2. Provides UI components for:
-   - Card creation/editing
-   - Study interface
-   - Review statistics
-3. Implements study session logic
-4. Manages review scheduling
+## Database Schema
 
-## Features
+### Documents Table (Core)
+```sql
+CREATE TABLE documents (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  metadata TEXT,
+  status TEXT NOT NULL DEFAULT 'active'
+);
+```
 
-1. **Card Management**
-   - Create/edit flashcards
-   - Organize cards into decks
-   - Import/export functionality
+### Flashcards Table
+```sql
+CREATE TABLE flashcards (
+  id TEXT PRIMARY KEY REFERENCES documents(id),
+  template_id TEXT NOT NULL,
+  deck_id TEXT NOT NULL,
+  fields TEXT NOT NULL,
+  tags TEXT,
+  interval INTEGER NOT NULL DEFAULT 0,
+  ease_factor REAL NOT NULL DEFAULT 2.5,
+  due_date INTEGER NOT NULL,
+  review_count INTEGER NOT NULL DEFAULT 0,
+  last_review_date INTEGER,
+  streak INTEGER NOT NULL DEFAULT 0
+);
+```
 
-2. **Study System**
-   - Spaced repetition algorithm
-   - Progress tracking
-   - Performance statistics
+### Decks Table
+```sql
+CREATE TABLE decks (
+  id TEXT PRIMARY KEY REFERENCES documents(id),
+  description TEXT,
+  parent_deck_id TEXT REFERENCES decks(id),
+  settings TEXT
+);
+```
 
-3. **UI Components**
-   - Card editor
-   - Study interface
-   - Statistics dashboard
+### Templates Table
+```sql
+CREATE TABLE templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  fields TEXT NOT NULL,
+  front_html TEXT NOT NULL,
+  back_html TEXT NOT NULL,
+  css TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+```
 
-## Data Flow
+### Review History Table
+```sql
+CREATE TABLE review_history (
+  id TEXT PRIMARY KEY,
+  card_id TEXT NOT NULL REFERENCES flashcards(id),
+  review_date INTEGER NOT NULL,
+  performance TEXT NOT NULL,
+  time_spent INTEGER NOT NULL,
+  previous_interval INTEGER NOT NULL,
+  new_interval INTEGER NOT NULL
+);
+```
 
-1. User creates/edits cards through UI
-2. Plugin validates and processes input
-3. Repository handles data persistence
-4. Study algorithm determines review schedule
-5. UI updates to reflect changes
+## Usage
 
-## Extending the Plugin
+### Creating a Flashcard
+```typescript
+const flashcard = await flashcardPlugin.createDocument({
+  title: 'Example Card',
+  templateId: 'basic',
+  deckId: 'default',
+  fields: [
+    { fieldId: 'front', value: 'What is the capital of France?' },
+    { fieldId: 'back', value: 'Paris' }
+  ],
+  tags: ['geography', 'europe']
+});
+```
 
-The flashcards plugin can be extended by:
-1. Adding new card types
-2. Implementing alternative study algorithms
-3. Creating additional visualization components
-4. Adding import/export formats
+### Processing a Review
+```typescript
+await flashcardPlugin.processReview(cardId, 4); // 4 = Good response
+```
 
-## Integration Points
-
-1. **Core Application**
-   - Document type registration
-   - Database schema extension
-   - UI routing integration
-
-2. **Other Plugins**
-   - Shared data types
-   - Component reuse
-   - Event handling
+### Getting Due Cards
+```typescript
+const dueCards = await flashcardPlugin.getDueCards('default', 20);

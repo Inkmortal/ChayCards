@@ -3,15 +3,17 @@
  *
  * Implements the DocumentTypePlugin interface for flashcards, providing:
  * - Core flashcard operations (CRUD)
- * - Spaced repetition algorithm (SuperMemo SM-2)
- * - Review processing
- * - Due card retrieval
+ * - Integration with review system
+ * - UI components for editing and reviewing
  */
 
-import { type ComponentType } from 'react'
 import { DocumentTypePlugin } from '../../core/types/document'
-import { FlashcardDocument, type FieldValue } from './types'
+import { FlashcardDocument } from './types'
 import { flashcardRepository } from './repository'
+import { flashcardSchema } from './schema'
+import { reviewService, ReviewQuality } from './review-service'
+import { FlashcardEditor } from './components/FlashcardEditor'
+import { FlashcardViewer } from './components/FlashcardViewer'
 
 /**
  * FlashcardPlugin class implements the document type plugin interface
@@ -23,6 +25,9 @@ export class FlashcardPlugin implements DocumentTypePlugin<FlashcardDocument> {
 
   /** Display name for UI */
   readonly displayName = 'Flashcard'
+
+  /** Database schema requirements for flashcard plugin */
+  readonly schema = flashcardSchema
 
   /**
    * Validates a flashcard document
@@ -73,74 +78,21 @@ export class FlashcardPlugin implements DocumentTypePlugin<FlashcardDocument> {
     return flashcardRepository.deleteFlashcard(id)
   }
 
-  // UI Components - implemented separately in UI layer
-  EditorComponent: ComponentType<{ document: FlashcardDocument }> = () => {
-    return null // Will be implemented in a separate UI component file
-  }
+  /** React component for editing flashcards */
+  EditorComponent = FlashcardEditor
 
-  ViewerComponent: ComponentType<{ document: FlashcardDocument }> = () => {
-    return null // Will be implemented in a separate UI component file
-  }
+  /** React component for reviewing flashcards */
+  ViewerComponent = FlashcardViewer
 
   /**
-   * Processes a flashcard review using the SuperMemo SM-2 algorithm
-   *
-   * Quality ratings:
-   * 0 - Complete blackout
-   * 1 - Incorrect response; the correct one remembered
-   * 2 - Incorrect response; where the correct one seemed easy to recall
-   * 3 - Correct response recalled with serious difficulty
-   * 4 - Correct response after a hesitation
-   * 5 - Perfect response
+   * Processes a flashcard review
    *
    * @param cardId ID of reviewed card
    * @param quality Review quality (0-5)
    * @returns Promise resolving to updated flashcard
    */
-  async processReview(cardId: string, quality: 0 | 1 | 2 | 3 | 4 | 5): Promise<FlashcardDocument> {
-    const card = await flashcardRepository.getFlashcardById(cardId)
-    const previousInterval = card.spacedRepetition.interval
-
-    // Calculate new spaced repetition data using SM-2 algorithm
-    const newSpacedRepetitionData = {
-      ...card.spacedRepetition,
-      // If quality >= 3 (correct response), increase interval by ease factor
-      // Otherwise, reset to 1 day
-      interval: quality >= 3 ? previousInterval * card.spacedRepetition.easeFactor : 1,
-
-      // Adjust ease factor based on performance
-      // Minimum ease factor is 1.3
-      easeFactor: Math.max(
-        1.3,
-        card.spacedRepetition.easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
-      ),
-
-      reviewCount: card.spacedRepetition.reviewCount + 1,
-      lastReviewDate: new Date(),
-      // Increment streak for correct answers, reset for incorrect
-      streak: quality >= 3 ? card.spacedRepetition.streak + 1 : 0
-    }
-
-    // Calculate next due date based on new interval
-    newSpacedRepetitionData.dueDate = new Date()
-    newSpacedRepetitionData.dueDate.setDate(
-      newSpacedRepetitionData.dueDate.getDate() + newSpacedRepetitionData.interval
-    )
-
-    // Record review in history
-    await flashcardRepository.addReviewHistory({
-      cardId,
-      reviewDate: new Date(),
-      performance: quality >= 4 ? 'easy' : quality >= 3 ? 'good' : quality >= 2 ? 'hard' : 'again',
-      timeSpent: 0, // TODO: Track actual review time
-      previousInterval,
-      newInterval: newSpacedRepetitionData.interval
-    })
-
-    // Update card with new spaced repetition data
-    return flashcardRepository.updateFlashcard(cardId, {
-      spacedRepetition: newSpacedRepetitionData
-    })
+  async processReview(cardId: string, quality: ReviewQuality): Promise<FlashcardDocument> {
+    return reviewService.processReview(cardId, quality)
   }
 
   /**
@@ -151,19 +103,7 @@ export class FlashcardPlugin implements DocumentTypePlugin<FlashcardDocument> {
    * @returns Promise resolving to array of due cards
    */
   async getDueCards(deckId: string, limit: number): Promise<FlashcardDocument[]> {
-    return flashcardRepository.getDueCards(deckId, limit)
-  }
-
-  /**
-   * Validates a field value against template rules
-   *
-   * @param fieldValue Field value to validate
-   * @returns Promise resolving to validation result
-   */
-  async validateFieldValue(fieldValue: FieldValue): Promise<boolean> {
-    // TODO: Implement field validation based on template rules
-    console.log('Validating field value:', fieldValue)
-    return true
+    return reviewService.getDueCards(deckId, limit)
   }
 }
 

@@ -1,106 +1,182 @@
-# Plugin System Documentation
+# Plugin System Architecture
 
 ## Overview
 
-The plugin system in ChayCards enables extending the application with new document types and views without modifying the core application code. Each plugin is a self-contained module that can define its own:
-- Document types and schemas
-- UI components and views
-- Data access patterns
+The ChayCards plugin system provides a flexible and extensible architecture for adding new document types to the application. Each plugin can define its own:
+- Database schema
+- UI components
 - Business logic
+- Data types
+
+## Core Concepts
+
+### Document Types
+All documents in the system inherit from a base document type that provides common properties:
+- Unique identifier
+- Document type
+- Title
+- Creation/update timestamps
+- Metadata
+- Status
+
+### Plugin Interface
+Plugins implement the `DocumentTypePlugin` interface, which defines:
+- Document type identification
+- Schema requirements
+- CRUD operations
+- UI components
+- Validation logic
+
+## Dynamic Schema System
+
+### Plugin Schema Definition
+Each plugin can define its database requirements through the `PluginSchema` interface:
+```typescript
+interface PluginSchema {
+  tables: string[]      // SQL statements for table creation
+  indexes: string[]     // SQL statements for index creation
+  initialData?: string[] // SQL statements for initial data
+}
+```
+
+### Schema Registration
+When a plugin is registered:
+1. Core system checks for schema requirements
+2. Plugin-specific tables are created
+3. Indexes are created for performance
+4. Initial data is inserted if provided
+
+### Core Document Table
+The system provides a base `documents` table that all plugins extend:
+```sql
+CREATE TABLE documents (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  metadata TEXT,
+  status TEXT NOT NULL DEFAULT 'active'
+);
+```
 
 ## Plugin Structure
 
-A typical plugin contains:
-
+### Recommended File Organization
 ```
-plugins/[plugin-name]/
-├── plugin.ts          # Plugin registration and configuration
-├── types.ts          # TypeScript types for plugin-specific data
-├── repository.ts     # Data access layer
-└── components/       # UI components (optional)
+src/plugins/your-plugin/
+├── components/         # UI Components
+│   ├── Editor.tsx     # Document editing interface
+│   └── Viewer.tsx     # Document viewing interface
+├── plugin.ts          # Main plugin implementation
+├── repository.ts      # Database operations
+├── schema.ts         # Database schema definition
+├── service.ts        # Business logic
+└── types.ts          # Type definitions
 ```
 
-## How Plugins Work
+### Component Guidelines
+- Keep UI components focused and single-purpose
+- Separate editing and viewing concerns
+- Use TypeScript for type safety
+- Follow React best practices
 
-1. **Registration**
-   - Plugins register themselves with the core application
-   - They declare their document types and schemas
-   - They provide UI components for rendering their content
+### Database Guidelines
+- Use foreign key constraints for referential integrity
+- Create indexes for frequently queried fields
+- Keep schema changes backwards compatible
+- Document schema design decisions
 
-2. **Document Types**
-   - Each plugin can define multiple document types
-   - Document types extend the base document interface
-   - Plugins handle validation and processing of their types
+## Creating a New Plugin
 
-3. **Data Storage**
-   - Plugins use repositories to manage their data
-   - The core database service handles persistence
-   - Each plugin maintains its own data access patterns
+1. Create Plugin Directory
+```bash
+mkdir src/plugins/your-plugin
+```
 
-4. **UI Integration**
-   - Plugins can provide custom views and components
-   - The main application loads these dynamically
-   - Plugin UI components receive necessary context and data
+2. Define Types
+```typescript
+// types.ts
+import { BaseDocument } from '../../core/types/document'
 
-## Example: Flashcards Plugin
+export interface YourDocument extends BaseDocument {
+  type: 'your-type'
+  // Add custom properties
+}
+```
 
-The flashcards plugin demonstrates the plugin system capabilities:
+3. Define Schema
+```typescript
+// schema.ts
+import { PluginSchema } from '../../core/types/document'
 
-### Types (`types.ts`)
-- Defines `Flashcard` document type
-- Specifies card-specific fields (front, back, etc.)
-- Declares validation rules
+export const yourSchema: PluginSchema = {
+  tables: [
+    `CREATE TABLE your_table (
+      id TEXT PRIMARY KEY REFERENCES documents(id),
+      // Add custom fields
+    )`
+  ],
+  indexes: [
+    'CREATE INDEX idx_your_index ON your_table(field)'
+  ]
+}
+```
 
-### Repository (`repository.ts`)
-- Handles flashcard-specific CRUD operations
-- Implements study algorithms
-- Manages card statistics and metadata
+4. Implement Plugin
+```typescript
+// plugin.ts
+import { DocumentTypePlugin } from '../../core/types/document'
+import { YourDocument } from './types'
+import { yourSchema } from './schema'
 
-### Plugin Registration (`plugin.ts`)
-- Registers flashcard document type
-- Provides UI components for card viewing/editing
-- Sets up data access patterns
+export class YourPlugin implements DocumentTypePlugin<YourDocument> {
+  readonly type = 'your-type'
+  readonly displayName = 'Your Plugin'
+  readonly schema = yourSchema
 
-## Creating New Plugins
+  // Implement required methods
+}
+```
 
-To create a new plugin:
+5. Register Plugin
+```typescript
+// main/index.ts
+import { DocumentTypeRegistry } from '../core/types/document'
+import { YourPlugin } from '../plugins/your-plugin/plugin'
 
-1. Create a new directory in `src/plugins/`
-2. Define your document types extending base interfaces
-3. Create a repository for data access
-4. Implement plugin registration
-5. Add UI components as needed
-
-## Plugin Lifecycle
-
-1. **Loading**
-   - Application discovers plugins at startup
-   - Plugins register their types and components
-   - Database schemas are extended
-
-2. **Runtime**
-   - Plugins handle their specific document operations
-   - UI components render plugin content
-   - Data is persisted through repositories
-
-3. **Cleanup**
-   - Plugins can perform cleanup on shutdown
-   - Data integrity is maintained
-   - Resources are released properly
+DocumentTypeRegistry.registerPlugin(new YourPlugin())
+```
 
 ## Best Practices
 
-1. **Isolation**
-   - Keep plugin code self-contained
-   - Use interfaces for core application interaction
-   - Handle plugin-specific errors internally
+### Schema Design
+- Use foreign keys to maintain data integrity
+- Create indexes for performance
+- Keep related data together
+- Use appropriate data types
+- Document schema decisions
 
-2. **Performance**
-   - Lazy load plugin components
-   - Optimize data access patterns
-   - Cache frequently used data
+### Code Organization
+- Separate concerns (UI, data, logic)
+- Keep files focused and manageable
+- Use clear naming conventions
+- Write comprehensive documentation
 
-3. **Maintenance**
-   - Document plugin interfaces clearly
-   - Version plugin schemas
-   - Provide migration paths for updates
+### Type Safety
+- Use TypeScript interfaces
+- Define clear type boundaries
+- Validate data at runtime
+- Document type constraints
+
+### Performance
+- Create appropriate indexes
+- Optimize queries
+- Batch operations when possible
+- Consider caching strategies
+
+## Example Plugins
+
+- [Flashcards Plugin](./flashcards.md): Implements spaced repetition system
+- Notes Plugin: Simple note-taking (coming soon)
+- Tasks Plugin: Task management (coming soon)

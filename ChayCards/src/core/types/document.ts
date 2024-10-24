@@ -25,6 +25,19 @@ export interface BaseDocument {
 }
 
 /**
+ * Plugin Schema Definition
+ * Defines database schema requirements for a plugin
+ */
+export interface PluginSchema {
+  /** SQL statements to create plugin-specific tables */
+  tables: string[]
+  /** SQL statements to create plugin-specific indexes */
+  indexes: string[]
+  /** SQL statements to insert initial data */
+  initialData?: string[]
+}
+
+/**
  * Document Type Plugin Interface
  * Defines the contract that all document type plugins must implement
  *
@@ -36,6 +49,9 @@ export interface DocumentTypePlugin<T extends BaseDocument> {
 
   /** Human-readable name for UI display */
   displayName: string
+
+  /** Database schema requirements for this plugin */
+  schema: PluginSchema
 
   /**
    * Validates a document of this type
