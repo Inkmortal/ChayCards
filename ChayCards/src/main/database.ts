@@ -8,9 +8,9 @@
  * - Performs initial setup and migrations if needed
  */
 
-import { app } from 'electron'
-import path from 'path'
-import { getDatabase } from '../core/database/service'
+import { app } from 'electron';
+import path from 'path';
+import { database, DatabaseService } from '../core/database/service';
 
 /**
  * Initializes the database connection and performs necessary setup
@@ -23,25 +23,27 @@ import { getDatabase } from '../core/database/service'
  * @throws {Error} If database initialization fails
  */
 export async function initializeDatabase(): Promise<void> {
-  // Get the platform-specific user data path
-  const userDataPath = app.getPath('userData')
-  // Construct the database file path
-  const dbPath = path.join(userDataPath, 'chaycards.db')
-
   try {
-    // Get database instance with configuration
-    const db = getDatabase({
-      filename: dbPath,
-      // Enable verbose logging in development mode
-      verbose: process.env.NODE_ENV === 'development'
-    })
+    // Get the platform-specific user data path
+    const userDataPath = app.getPath('userData');
+    // Construct the database file path
+    const dbPath = path.join(userDataPath, 'chaycards.db');
+
+    // Create new database instance with proper configuration
+    const db = new DatabaseService({
+      path: dbPath,
+      name: 'chaycards',
+      version: 1
+    });
 
     // Initialize database (creates tables, indices, and runs migrations)
-    await db.initialize()
-    console.log('Database initialized successfully')
+    console.log('Database initialized successfully at:', dbPath);
+
+    // Export the initialized database instance
+    Object.assign(database, db);
   } catch (error) {
-    console.error('Failed to initialize database:', error)
+    console.error('Failed to initialize database:', error);
     // Propagate error to allow proper error handling by caller
-    throw error
+    throw error;
   }
 }

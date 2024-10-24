@@ -1,68 +1,106 @@
-# ChayCards Application Documentation
+# ChayCards Documentation
 
-## Application Architecture
+## Overview
 
-ChayCards is an Electron-based application using React for the frontend. The application follows a plugin-based architecture that allows for extensibility.
+ChayCards is a flexible document management system built with Electron, React, and TypeScript. It provides a plugin-based architecture that allows for different types of documents (notes, flashcards, etc.) to be managed within a single application.
 
-### Key Components
+## Core Features
 
-1. **Core Layer** (`src/core/`)
-   - Contains the fundamental database and type definitions
-   - Handles base document types and database schema management
-   - Provides services for data persistence
+- Plugin-based architecture for extensible document types
+- Unified document management interface
+- Dark mode support
+- SQLite database for persistent storage
+- Type-safe IPC communication
 
-2. **Plugin System** (`src/plugins/`)
-   - Allows extending the application with new document types and views
-   - Each plugin can define its own:
-     - Document types and schemas
-     - UI components and views
-     - Business logic and data handling
-   - Example: Flashcards plugin implements flashcard-specific functionality
-
-3. **Main Process** (`src/main/`)
-   - Electron main process code
-   - Handles database initialization and management
-   - Manages IPC communication between renderer and main processes
-
-4. **Renderer Process** (`src/renderer/`)
-   - React-based UI implementation
-   - Handles user interface and interactions
-   - Communicates with main process via IPC
-
-5. **Preload** (`src/preload/`)
-   - Provides secure bridge between renderer and main processes
-   - Exposes specific main process functionality to renderer
-
-## Directory Structure
+## Project Structure
 
 ```
-src/
-├── core/               # Core application functionality
-│   ├── database/      # Database schema and services
-│   └── types/         # Base type definitions
-├── plugins/           # Plugin implementations
-│   └── flashcards/    # Flashcard plugin example
-├── main/              # Electron main process
-├── renderer/          # React UI implementation
-└── preload/           # Electron preload scripts
+ChayCards/
+├── src/
+│   ├── core/               # Core system functionality
+│   │   ├── database/       # Database services
+│   │   └── types/         # Core type definitions
+│   ├── plugins/           # Plugin implementations
+│   │   └── notes/         # Notes plugin
+│   ├── main/             # Electron main process
+│   ├── preload/          # Preload scripts for IPC
+│   └── renderer/         # React frontend
+└── docs/                 # Documentation
 ```
 
 ## Plugin System
 
-The plugin system allows for extending the application with new document types and functionality:
+The application uses a plugin-based architecture where each document type is implemented as a plugin. Plugins provide:
 
-1. Each plugin can define its own document types and schemas
-2. Plugins register their document types with the core database service
-3. The application dynamically loads plugin UI components and handlers
-4. New plugins can be added without modifying core application code
+- Document type definition
+- Database schema
+- UI components for editing and viewing
+- Business logic for document operations
 
-## Database Architecture
+### Creating a Plugin
 
-The database system uses a flexible schema approach:
+To create a new plugin:
 
-1. Core schema defines base document structure
-2. Plugins can extend the schema for their specific document types
-3. Document types are registered at runtime
-4. Each plugin manages its own data access through repositories
+1. Implement the `DocumentTypePlugin` interface
+2. Define document type and schema
+3. Create UI components
+4. Register the plugin with the system
 
-More detailed documentation for each component can be found in the respective subdirectories.
+Example:
+```typescript
+export class YourPlugin implements DocumentTypePlugin<YourDocument> {
+  type = 'your-type';
+  displayName = 'Your Plugin';
+  
+  // Implement required methods and components
+}
+```
+
+## IPC Communication
+
+The application uses a secure IPC system for communication between the main and renderer processes:
+
+- `get-plugins`: Retrieves all registered plugins
+- `get-plugin`: Gets a specific plugin by type
+- `get-all-documents`: Retrieves all documents across all plugins
+- `save-document`: Creates or updates a document
+
+## User Interface
+
+The main interface provides:
+
+- Document list sorted by last modified date
+- Create new document buttons for each plugin type
+- Document type-specific editors and viewers
+- Dark mode support
+
+## Development
+
+### Prerequisites
+
+- Node.js 16+
+- npm or yarn
+- TypeScript knowledge
+- Electron/React experience
+
+### Setup
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Run in development: `npm run dev`
+4. Build: `npm run build`
+
+### Adding a New Plugin
+
+1. Create a new directory in `src/plugins/`
+2. Implement the required interfaces
+3. Create UI components
+4. Register the plugin in `main/index.ts`
+
+## Best Practices
+
+- Use TypeScript for type safety
+- Follow React best practices
+- Implement proper error handling
+- Add documentation for new features
+- Write clean, maintainable code

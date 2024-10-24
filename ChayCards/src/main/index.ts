@@ -1,155 +1,180 @@
-/**
- * Main Process Entry Point
- *
- * This file serves as the entry point for Electron's main process, handling:
- * - Window management
- * - Application lifecycle
- * - IPC (Inter-Process Communication)
- * - Plugin system initialization
- * - Database setup
- */
+import { app, shell, BrowserWindow, ipcMain } from 'electron';
+import { join } from 'path';
+import { electronApp, optimizer, is } from '@electron-toolkit/utils';
+import icon from '../../resources/icon.png?asset';
+import { database } from '../core/database/service';
+import { DocumentTypeRegistry, BaseDocument } from '../core/types/document';
+import { PluginLoader } from '../core/plugins/loader';
+import { coreSchema } from '../core/database/schema';
 
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
-import { initializeDatabase } from './database'
-import { getDatabase } from '../core/database/service'
-import { DocumentTypeRegistry } from '../core/types/document'
-import { flashcardPlugin } from '../plugins/flashcards/plugin'
+// Initialize registry
+const registry = new DocumentTypeRegistry();
 
-/**
- * Creates the main application window with appropriate settings
- * and loads the renderer process.
- */
-async function createWindow(): Promise<void> {
-  // Create the browser window with specific configurations
+// Initialize database schema
+async function initializeDatabase() {
+  try {
+    await database.run(coreSchema);
+  } catch (error) {
+    console.error('Error initializing core schema:', error);
+  }
+}
+
+// Load plugins
+async function loadPlugins() {
+  try {
+    const loader = new PluginLoader();
+    const plugins = await loader.loadPlugins();
+
+    if (plugins.length === 0) {
+      console.warn('No plugins were loaded');
+      return;
+    }
+
+    // Register each loaded plugin
+    for (const plugin of plugins) {
+      try {
+        await plugin.initialize();
+        registry.registerPlugin(plugin);
+        console.log(`Registered plugin: ${plugin.displayName}`);
+      } catch (error) {
+        console.error(`Error initializing plugin ${plugin.displayName}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Error during plugin loading:', error);
+  }
+}
+
+// IPC Handlers
+ipcMain.handle('get-plugins', () => {
+  return registry.getAllPlugins().map(plugin => ({
+    type: plugin.type,
+    displayName: plugin.displayName
+  }));
+});
+
+ipcMain.handle('get-plugin', (_, type: string) => {
+  const plugin = registry.getPlugin(type);
+  if (!plugin) throw new Error(`Plugin not found: ${type}`);
+
+  // Only return serializable data
+  return {
+    type: plugin.type,
+    displayName: plugin.displayName
+  };
+});
+
+ipcMain.handle('get-all-documents', async () => {
+  const plugins = registry.getAllPlugins();
+  const allDocs: BaseDocument[] = [];
+
+  for (const plugin of plugins) {
+    try {
+      const docs = await plugin.getAllDocuments();
+      allDocs.push(...docs);
+    } catch (error) {
+      console.error(`Error getting documents from plugin ${plugin.type}:`, error);
+    }
+  }
+
+  return allDocs;
+});
+
+ipcMain.handle('save-document', async (_, type: string, data: Partial<BaseDocument>) => {
+  const plugin = registry.getPlugin(type);
+  if (!plugin) throw new Error(`Plugin not found: ${type}`);
+
+  try {
+    if (data.id) {
+      return await plugin.updateDocument(data.id, data);
+    } else {
+      return await plugin.createDocument(data);
+    }
+  } catch (error) {
+    console.error(`Error saving document:`, error);
+    throw error;
+  }
+});
+
+ipcMain.handle('delete-document', async (_, type: string, id: string) => {
+  const plugin = registry.getPlugin(type);
+  if (!plugin) throw new Error(`Plugin not found: ${type}`);
+
+  try {
+    await plugin.deleteDocument(id);
+  } catch (error) {
+    console.error(`Error deleting document:`, error);
+    throw error;
+  }
+});
+
+function createWindow(): void {
+  // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 900,
+    height: 670,
     show: false,
     autoHideMenuBar: true,
-    // Set icon for Linux platform
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      // Load preload script for IPC bridge
       preload: join(__dirname, '../preload/index.js'),
-      // Disable sandbox for database access
-      sandbox: false
+      sandbox: false,
+      nodeIntegration: true,
+      contextIsolation: true
     }
-  })
+  });
 
-  // Show window when ready
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
+    mainWindow.show();
+  });
 
-  // Handle external links
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
+    shell.openExternal(details.url);
+    return { action: 'deny' };
+  });
 
-  // Load appropriate URL based on environment
+  // HMR for renderer base on electron-vite cli.
+  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    // Development: Load from dev server
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
-    // Production: Load local HTML file
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 }
 
-/**
- * Initializes core application components:
- * - Database setup
- * - Plugin registration
- */
-async function initialize(): Promise<void> {
-  try {
-    // Set up database connection and schema
-    await initializeDatabase()
-
-    // Register available plugins with document type registry
-    DocumentTypeRegistry.registerPlugin(flashcardPlugin)
-
-    console.log('Application initialized successfully')
-  } catch (error) {
-    console.error('Failed to initialize application:', error)
-    app.quit()
-  }
-}
-
-// Application Lifecycle Management
-
-/**
- * Main application initialization when Electron is ready
- */
+// This method will be called when Electron has finished
+// initialization and is ready to create browser windows.
 app.whenReady().then(async () => {
-  // Set Windows-specific app user model ID
-  electronApp.setAppUserModelId('com.electron')
+  try {
+    // Initialize database
+    await initializeDatabase();
 
-  // Configure development tools and shortcuts
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+    // Load and initialize plugins
+    await loadPlugins();
 
-  // Initialize core components
-  await initialize()
+    // Set up electron app
+    electronApp.setAppUserModelId('com.electron');
 
-  // Create and show main window
-  await createWindow()
+    // Default open or close DevTools by F12 in development
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window);
+    });
 
-  // Handle macOS-specific window behavior
-  app.on('activate', async function () {
-    // Recreate window when dock icon is clicked (macOS)
-    if (BrowserWindow.getAllWindows().length === 0) {
-      await createWindow()
-    }
-  })
-})
-
-/**
- * Handle application quit behavior
- */
-app.on('window-all-closed', () => {
-  // Quit application when all windows are closed (except on macOS)
-  if (process.platform !== 'darwin') {
-    app.quit()
+    createWindow();
+  } catch (error) {
+    console.error('Error during initialization:', error);
   }
-})
 
-/**
- * Cleanup resources before quitting
- */
-app.on('before-quit', () => {
-  // Close database connection
-  const db = getDatabase()
-  db.close()
-})
+  app.on('activate', function () {
+    // On macOS it's common to re-create a window in the app when the
+    // dock icon is clicked and there are no other windows open.
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
 
-// IPC (Inter-Process Communication) Handlers
-
-/**
- * Flashcard Plugin IPC Handlers
- * Bridge between renderer process and flashcard plugin functionality
- */
-ipcMain.handle('flashcard:create', async (_, data) => {
-  return flashcardPlugin.createDocument(data)
-})
-
-ipcMain.handle('flashcard:update', async (_, id, data) => {
-  return flashcardPlugin.updateDocument(id, data)
-})
-
-ipcMain.handle('flashcard:delete', async (_, id) => {
-  return flashcardPlugin.deleteDocument(id)
-})
-
-ipcMain.handle('flashcard:getDue', async (_, deckId, limit) => {
-  return flashcardPlugin.getDueCards(deckId, limit)
-})
-
-ipcMain.handle('flashcard:review', async (_, cardId, quality) => {
-  return flashcardPlugin.processReview(cardId, quality)
-})
+// Quit when all windows are closed, except on macOS.
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});

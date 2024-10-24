@@ -2,181 +2,145 @@
 
 ## Overview
 
-The ChayCards plugin system provides a flexible and extensible architecture for adding new document types to the application. Each plugin can define its own:
-- Database schema
-- UI components
-- Business logic
-- Data types
+The ChayCards plugin system provides a flexible and extensible architecture for adding new document types. Each plugin is a self-contained module that implements the `DocumentTypePlugin` interface.
 
 ## Core Concepts
 
 ### Document Types
-All documents in the system inherit from a base document type that provides common properties:
-- Unique identifier
-- Document type
-- Title
-- Creation/update timestamps
-- Metadata
-- Status
 
-### Plugin Interface
-Plugins implement the `DocumentTypePlugin` interface, which defines:
-- Document type identification
-- Schema requirements
-- CRUD operations
-- UI components
-- Validation logic
-
-## Dynamic Schema System
-
-### Plugin Schema Definition
-Each plugin can define its database requirements through the `PluginSchema` interface:
+All documents inherit from the `BaseDocument` interface:
 ```typescript
-interface PluginSchema {
-  tables: string[]      // SQL statements for table creation
-  indexes: string[]     // SQL statements for index creation
-  initialData?: string[] // SQL statements for initial data
+interface BaseDocument {
+  id: string;
+  type: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+  status: string;
+  metadata: Record<string, any>;
 }
 ```
 
-### Schema Registration
-When a plugin is registered:
-1. Core system checks for schema requirements
-2. Plugin-specific tables are created
-3. Indexes are created for performance
-4. Initial data is inserted if provided
+### Plugin Interface
 
-### Core Document Table
-The system provides a base `documents` table that all plugins extend:
-```sql
-CREATE TABLE documents (
-  id TEXT PRIMARY KEY,
-  type TEXT NOT NULL,
-  title TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  metadata TEXT,
-  status TEXT NOT NULL DEFAULT 'active'
-);
-```
-
-## Plugin Structure
-
-### Recommended File Organization
-```
-src/plugins/your-plugin/
-├── components/         # UI Components
-│   ├── Editor.tsx     # Document editing interface
-│   └── Viewer.tsx     # Document viewing interface
-├── plugin.ts          # Main plugin implementation
-├── repository.ts      # Database operations
-├── schema.ts         # Database schema definition
-├── service.ts        # Business logic
-└── types.ts          # Type definitions
-```
-
-### Component Guidelines
-- Keep UI components focused and single-purpose
-- Separate editing and viewing concerns
-- Use TypeScript for type safety
-- Follow React best practices
-
-### Database Guidelines
-- Use foreign key constraints for referential integrity
-- Create indexes for frequently queried fields
-- Keep schema changes backwards compatible
-- Document schema design decisions
-
-## Creating a New Plugin
-
-1. Create Plugin Directory
-```bash
-mkdir src/plugins/your-plugin
-```
-
-2. Define Types
 ```typescript
-// types.ts
-import { BaseDocument } from '../../core/types/document'
+interface DocumentTypePlugin<T extends BaseDocument> {
+  type: string;
+  displayName: string;
+  schema: any;
+  validateDocument(doc: T): Promise<boolean>;
+  createDocument(data: Partial<T>): Promise<T>;
+  updateDocument(id: string, data: Partial<T>): Promise<T>;
+  deleteDocument(id: string): Promise<void>;
+  getAllDocuments(): Promise<T[]>;
+  EditorComponent: ComponentType<{ document?: T; onSave: (doc: Partial<T>) => Promise<void> }>;
+  ViewerComponent: ComponentType<{ document: T }>;
+}
+```
 
-export interface YourDocument extends BaseDocument {
-  type: 'your-type'
+## Implementation Guide
+
+### 1. Define Types
+
+```typescript
+interface YourDocument extends BaseDocument {
+  type: 'your-type';
   // Add custom properties
 }
 ```
 
-3. Define Schema
-```typescript
-// schema.ts
-import { PluginSchema } from '../../core/types/document'
+### 2. Create Schema
 
-export const yourSchema: PluginSchema = {
-  tables: [
-    `CREATE TABLE your_table (
-      id TEXT PRIMARY KEY REFERENCES documents(id),
-      // Add custom fields
-    )`
-  ],
-  indexes: [
-    'CREATE INDEX idx_your_index ON your_table(field)'
-  ]
-}
+```typescript
+const schema = `
+  CREATE TABLE IF NOT EXISTS your_table (
+    id TEXT PRIMARY KEY REFERENCES documents(id),
+    // Add custom fields
+  );
+`;
 ```
 
-4. Implement Plugin
-```typescript
-// plugin.ts
-import { DocumentTypePlugin } from '../../core/types/document'
-import { YourDocument } from './types'
-import { yourSchema } from './schema'
+### 3. Implement Components
 
+```typescript
+const Editor: React.FC<EditorProps> = ({ document, onSave }) => {
+  // Implement editor UI
+};
+
+const Viewer: React.FC<ViewerProps> = ({ document }) => {
+  // Implement viewer UI
+};
+```
+
+### 4. Create Plugin Class
+
+```typescript
 export class YourPlugin implements DocumentTypePlugin<YourDocument> {
-  readonly type = 'your-type'
-  readonly displayName = 'Your Plugin'
-  readonly schema = yourSchema
-
+  type = 'your-type';
+  displayName = 'Your Plugin';
+  schema = schema;
+  
   // Implement required methods
+  async createDocument(data: Partial<YourDocument>): Promise<YourDocument> {
+    // Implementation
+  }
+  
+  // ... other methods
 }
 ```
 
-5. Register Plugin
-```typescript
-// main/index.ts
-import { DocumentTypeRegistry } from '../core/types/document'
-import { YourPlugin } from '../plugins/your-plugin/plugin'
+## Integration
 
-DocumentTypeRegistry.registerPlugin(new YourPlugin())
+### Main Process
+
+The main process manages plugin registration and IPC communication:
+
+```typescript
+const registry = new DocumentTypeRegistry();
+registry.registerPlugin(new YourPlugin());
+```
+
+### IPC Handlers
+
+```typescript
+ipcMain.handle('get-plugins', () => {
+  return registry.getAllPlugins();
+});
+
+ipcMain.handle('get-all-documents', async () => {
+  const allDocs = [];
+  for (const plugin of registry.getAllPlugins()) {
+    const docs = await plugin.getAllDocuments();
+    allDocs.push(...docs);
+  }
+  return allDocs;
+});
 ```
 
 ## Best Practices
 
-### Schema Design
-- Use foreign keys to maintain data integrity
-- Create indexes for performance
-- Keep related data together
-- Use appropriate data types
-- Document schema decisions
+1. **Type Safety**
+   - Use TypeScript interfaces
+   - Validate data at runtime
+   - Handle errors gracefully
 
-### Code Organization
-- Separate concerns (UI, data, logic)
-- Keep files focused and manageable
-- Use clear naming conventions
-- Write comprehensive documentation
+2. **UI Components**
+   - Follow React patterns
+   - Use composition
+   - Handle loading/error states
 
-### Type Safety
-- Use TypeScript interfaces
-- Define clear type boundaries
-- Validate data at runtime
-- Document type constraints
+3. **Database Operations**
+   - Use transactions where appropriate
+   - Handle concurrent operations
+   - Validate data before saving
 
-### Performance
-- Create appropriate indexes
-- Optimize queries
-- Batch operations when possible
-- Consider caching strategies
+4. **Testing**
+   - Test plugin methods
+   - Test UI components
+   - Test IPC communication
 
 ## Example Plugins
 
-- [Flashcards Plugin](./flashcards.md): Implements spaced repetition system
-- Notes Plugin: Simple note-taking (coming soon)
-- Tasks Plugin: Task management (coming soon)
+- Notes Plugin: Simple markdown notes
+- (Future) Tasks Plugin: Task management
+- (Future) Flashcards Plugin: Spaced repetition system
