@@ -1,122 +1,155 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron';
-import { join } from 'path';
-import { electronApp, optimizer, is } from '@electron-toolkit/utils';
-import icon from '../../resources/icon.png?asset';
-import { initializeDatabase } from './database';
-import { getDatabase } from '../core/database/service';
-import { DocumentTypeRegistry } from '../core/types/document';
-import { flashcardPlugin } from '../plugins/flashcards/plugin';
+/**
+ * Main Process Entry Point
+ *
+ * This file serves as the entry point for Electron's main process, handling:
+ * - Window management
+ * - Application lifecycle
+ * - IPC (Inter-Process Communication)
+ * - Plugin system initialization
+ * - Database setup
+ */
 
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { join } from 'path'
+import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import icon from '../../resources/icon.png?asset'
+import { initializeDatabase } from './database'
+import { getDatabase } from '../core/database/service'
+import { DocumentTypeRegistry } from '../core/types/document'
+import { flashcardPlugin } from '../plugins/flashcards/plugin'
+
+/**
+ * Creates the main application window with appropriate settings
+ * and loads the renderer process.
+ */
 async function createWindow(): Promise<void> {
-  // Create the browser window.
+  // Create the browser window with specific configurations
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     show: false,
     autoHideMenuBar: true,
+    // Set icon for Linux platform
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
+      // Load preload script for IPC bridge
       preload: join(__dirname, '../preload/index.js'),
+      // Disable sandbox for database access
       sandbox: false
     }
-  });
+  })
 
+  // Show window when ready
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show();
-  });
+    mainWindow.show()
+  })
 
+  // Handle external links
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url);
-    return { action: 'deny' };
-  });
+    shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
+  // Load appropriate URL based on environment
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+    // Development: Load from dev server
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    // Production: Load local HTML file
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
-// Initialize app
+/**
+ * Initializes core application components:
+ * - Database setup
+ * - Plugin registration
+ */
 async function initialize(): Promise<void> {
   try {
-    // Initialize database
-    await initializeDatabase();
+    // Set up database connection and schema
+    await initializeDatabase()
 
-    // Register plugins
-    DocumentTypeRegistry.registerPlugin(flashcardPlugin);
+    // Register available plugins with document type registry
+    DocumentTypeRegistry.registerPlugin(flashcardPlugin)
 
-    console.log('Application initialized successfully');
+    console.log('Application initialized successfully')
   } catch (error) {
-    console.error('Failed to initialize application:', error);
-    app.quit();
+    console.error('Failed to initialize application:', error)
+    app.quit()
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// Application Lifecycle Management
+
+/**
+ * Main application initialization when Electron is ready
+ */
 app.whenReady().then(async () => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron');
+  // Set Windows-specific app user model ID
+  electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
+  // Configure development tools and shortcuts
   app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window);
-  });
+    optimizer.watchWindowShortcuts(window)
+  })
 
-  // Initialize application
-  await initialize();
+  // Initialize core components
+  await initialize()
 
-  // Create main window
-  await createWindow();
+  // Create and show main window
+  await createWindow()
 
+  // Handle macOS-specific window behavior
   app.on('activate', async function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
+    // Recreate window when dock icon is clicked (macOS)
     if (BrowserWindow.getAllWindows().length === 0) {
-      await createWindow();
+      await createWindow()
     }
-  });
-});
+  })
+})
 
-// Quit when all windows are closed, except on macOS.
+/**
+ * Handle application quit behavior
+ */
 app.on('window-all-closed', () => {
+  // Quit application when all windows are closed (except on macOS)
   if (process.platform !== 'darwin') {
-    app.quit();
+    app.quit()
   }
-});
+})
 
-// Handle database cleanup on app quit
+/**
+ * Cleanup resources before quitting
+ */
 app.on('before-quit', () => {
-  const db = getDatabase();
-  db.close();
-});
+  // Close database connection
+  const db = getDatabase()
+  db.close()
+})
 
-// In this file you can include the rest of your app's specific main process code.
-// You can also put them in separate files and require them here.
+// IPC (Inter-Process Communication) Handlers
 
-// IPC Handlers
+/**
+ * Flashcard Plugin IPC Handlers
+ * Bridge between renderer process and flashcard plugin functionality
+ */
 ipcMain.handle('flashcard:create', async (_, data) => {
-  return flashcardPlugin.createDocument(data);
-});
+  return flashcardPlugin.createDocument(data)
+})
 
 ipcMain.handle('flashcard:update', async (_, id, data) => {
-  return flashcardPlugin.updateDocument(id, data);
-});
+  return flashcardPlugin.updateDocument(id, data)
+})
 
 ipcMain.handle('flashcard:delete', async (_, id) => {
-  return flashcardPlugin.deleteDocument(id);
-});
+  return flashcardPlugin.deleteDocument(id)
+})
 
 ipcMain.handle('flashcard:getDue', async (_, deckId, limit) => {
-  return flashcardPlugin.getDueCards(deckId, limit);
-});
+  return flashcardPlugin.getDueCards(deckId, limit)
+})
 
 ipcMain.handle('flashcard:review', async (_, cardId, quality) => {
-  return flashcardPlugin.processReview(cardId, quality);
-});
+  return flashcardPlugin.processReview(cardId, quality)
+})

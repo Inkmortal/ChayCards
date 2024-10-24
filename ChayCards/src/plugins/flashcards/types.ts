@@ -1,105 +1,130 @@
-import { BaseDocument } from '../../core/types/document';
-
 /**
- * Supported field types for flashcard templates
+ * Flashcard Domain Model Types
+ *
+ * This module defines the core types and interfaces for the flashcard system:
+ * - Template system for card layouts
+ * - Field types and validation
+ * - Spaced repetition data structures
+ * - Document types for cards and decks
+ * - Review history tracking
  */
-export type FieldType = 'text' | 'image' | 'audio' | 'maskedImage';
+
+import { BaseDocument } from '../../core/types/document'
 
 /**
- * Template field definition
+ * Supported field types for flashcard content
+ * - text: Plain text content
+ * - image: Image file or URL
+ * - audio: Audio file or URL
+ * - maskedImage: Image with maskable regions for study
+ */
+export type FieldType = 'text' | 'image' | 'audio' | 'maskedImage'
+
+/**
+ * Template Field Definition
+ * Defines structure and validation rules for a field in a card template
  */
 export interface TemplateField {
-  id: string;
-  name: string;
-  type: FieldType;
-  required: boolean;
-  placeholder?: string;
+  id: string              // Unique field identifier
+  name: string           // Display name
+  type: FieldType       // Content type
+  required: boolean    // Whether field must have a value
+  placeholder?: string // Optional placeholder text
   validationRules?: {
-    minLength?: number;
-    maxLength?: number;
-    pattern?: string;
-    allowedFileTypes?: string[];
-  };
+    minLength?: number           // Minimum content length
+    maxLength?: number          // Maximum content length
+    pattern?: string           // Regex validation pattern
+    allowedFileTypes?: string[] // Allowed file extensions for media
+  }
 }
 
 /**
- * Template definition for flashcards
+ * Flashcard Template Definition
+ * Defines the structure and appearance of a type of flashcard
  */
 export interface FlashcardTemplate {
-  id: string;
-  name: string;
-  description: string;
-  fields: TemplateField[];
-  frontHtml: string; // HTML template for front of card
-  backHtml: string;  // HTML template for back of card
-  css?: string;      // Custom CSS for this template
+  id: string              // Template identifier
+  name: string           // Display name
+  description: string   // Template description
+  fields: TemplateField[] // Field definitions
+  frontHtml: string     // Front side template (supports {{field}} syntax)
+  backHtml: string      // Back side template (supports {{field}} syntax)
+  css?: string         // Custom styling for cards using this template
 }
 
 /**
- * Field value for a flashcard
+ * Field Value
+ * Represents the content of a field in a flashcard
  */
 export interface FieldValue {
-  fieldId: string;
-  value: string;     // For text fields: text content
-                     // For media fields: file path or URL
-  maskData?: {       // For masked images
-    regions: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }[];
-  };
+  fieldId: string    // References TemplateField.id
+  value: string     // Content value:
+                   // - For text: actual text content
+                   // - For media: file path or URL
+  maskData?: {     // Optional masking data for maskedImage type
+    regions: {    // Masked regions in the image
+      x: number
+      y: number
+      width: number
+      height: number
+    }[]
+  }
 }
 
 /**
- * Spaced repetition data for a flashcard
+ * Spaced Repetition Data
+ * Tracks learning progress using SuperMemo SM-2 algorithm
  */
 export interface SpacedRepetitionData {
-  interval: number;          // Current interval in days
-  easeFactor: number;        // Current ease factor
-  dueDate: Date;            // Next review date
-  reviewCount: number;       // Total number of reviews
-  lastReviewDate?: Date;     // Date of last review
-  streak: number;           // Current streak of correct answers
+  interval: number       // Current interval between reviews (days)
+  easeFactor: number    // Ease factor (≥ 1.3) affects interval growth
+  dueDate: Date        // Next scheduled review date
+  reviewCount: number  // Total number of reviews
+  lastReviewDate?: Date // Last review timestamp
+  streak: number      // Consecutive correct reviews
 }
 
 /**
- * Flashcard document type
+ * Flashcard Document
+ * Represents a single flashcard in the system
+ * Extends BaseDocument with flashcard-specific properties
  */
 export interface FlashcardDocument extends BaseDocument {
-  type: 'flashcard';
-  templateId: string;
-  fields: FieldValue[];
-  tags: string[];
-  spacedRepetition: SpacedRepetitionData;
-  deckId: string;           // ID of the deck this card belongs to
-  status: 'active' | 'suspended' | 'archived';
+  type: 'flashcard'              // Document type discriminator
+  templateId: string            // References FlashcardTemplate.id
+  fields: FieldValue[]         // Card content
+  tags: string[]              // Categorization tags
+  spacedRepetition: SpacedRepetitionData  // Learning progress
+  deckId: string             // Parent deck reference
+  status: 'active' | 'suspended' | 'archived'  // Card state
 }
 
 /**
- * Deck for organizing flashcards
+ * Deck
+ * Represents a collection of flashcards
+ * Supports hierarchical organization through parentDeckId
  */
 export interface Deck extends BaseDocument {
-  type: 'deck';
-  description?: string;
-  parentDeckId?: string;    // For nested decks
+  type: 'deck'           // Document type discriminator
+  description?: string  // Optional deck description
+  parentDeckId?: string // Parent deck for nesting
   settings?: {
-    newCardsPerDay?: number;
-    reviewsPerDay?: number;
-    learningSteps?: number[];
-  };
+    newCardsPerDay?: number   // Daily new card limit
+    reviewsPerDay?: number   // Daily review limit
+    learningSteps?: number[] // Custom learning intervals
+  }
 }
 
 /**
- * Review history entry
+ * Review History Entry
+ * Records individual review sessions for analytics and scheduling
  */
 export interface ReviewHistory {
-  id: string;
-  cardId: string;
-  reviewDate: Date;
-  performance: 'again' | 'hard' | 'good' | 'easy';
-  timeSpent: number;        // Time spent in milliseconds
-  previousInterval: number;
-  newInterval: number;
+  id: string           // Review entry identifier
+  cardId: string      // Referenced flashcard
+  reviewDate: Date   // Review timestamp
+  performance: 'again' | 'hard' | 'good' | 'easy'  // Review quality
+  timeSpent: number  // Review duration (milliseconds)
+  previousInterval: number  // Interval before review
+  newInterval: number     // Interval after review
 }

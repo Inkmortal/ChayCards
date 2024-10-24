@@ -29,6 +29,7 @@
     "@tailwindcss/forms": "^0.5.6",
     "autoprefixer": "^10.4.16",
     "better-sqlite3": "^8.7.0",
+    "chaycards": "file:",
     "electron-updater": "^6.1.4",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.3",
@@ -43,8 +44,8 @@
     "@types/react": "^18.2.20",
     "@types/react-dom": "^18.2.7",
     "@types/uuid": "^9.0.4",
-    "@typescript-eslint/eslint-plugin": "^6.6.0",
-    "@typescript-eslint/parser": "^6.6.0",
+    "@typescript-eslint/eslint-plugin": "^7.5.0",
+    "@typescript-eslint/parser": "^7.5.0",
     "@vitejs/plugin-react": "^4.0.4",
     "electron": "^25.6.0",
     "electron-builder": "^24.6.3",
@@ -56,7 +57,7 @@
     "prettier": "^3.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "typescript": "^5.1.6",
+    "typescript": "5.5.3",
     "vite": "^4.4.9"
   }
 }
