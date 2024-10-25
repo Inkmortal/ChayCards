@@ -1,0 +1,33 @@
+{
+  "name": "chaycards",
+  "version": "0.1.0",
+  "description": "A modular document management application",
+  "main": "dist/main/index.js",
+  "private": true,
+  "scripts": {
+    "dev": "tsc && electron .",
+    "build": "tsc && electron-builder"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.27.0"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "electron": "33.0.2",
+    "electron-builder": "25.1.8",
+    "typescript": "5.6.3"
+  },
+  "build": {
+    "appId": "com.chaycards.app",
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ]
+  }
+}
