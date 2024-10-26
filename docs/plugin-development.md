@@ -1,16 +1,57 @@
 # Plugin Development Guide
 
 ## Overview
-This guide explains how to create plugins for ChayCards. Plugins can add new features, document types, or extend existing functionality.
+ChayCards plugins are TypeScript modules that extend the application's functionality. Plugins can add new features, document types, or extend existing functionality, all with hot-reloading support during development.
+
+## Quick Start
+
+1. Create a new plugin:
+```bash
+# Copy example plugin
+cp -r plugins/src/example plugins/src/my-plugin
+```
+
+2. Implement your plugin:
+```typescript
+import { Plugin } from '../types';
+
+const MyPlugin: Plugin = {
+  id: 'com.example.my-plugin',
+  name: 'My Plugin',
+  version: '1.0.0',
+  description: 'My awesome plugin',
+  author: 'Your Name',
+
+  async onLoad() {
+    // Plugin initialization
+  },
+
+  async onUnload() {
+    // Cleanup
+  }
+};
+
+export default MyPlugin;
+```
+
+3. Test your plugin:
+```bash
+npm run test:plugins
+```
 
 ## Plugin Structure
+
+### Core Interface
 ```typescript
 interface Plugin {
+  // Required metadata
   id: string;                 // Unique identifier
   name: string;              // Display name
   version: string;           // Semantic version
   description: string;       // Plugin description
   author: string;           // Author information
+  
+  // Optional dependencies
   dependencies?: string[];  // Other required plugins
   
   // Lifecycle hooks
@@ -24,96 +65,92 @@ interface Plugin {
     components?: ComponentExtension[];
   }
   
-  // API exposure
+  // Public API
   api?: Record<string, unknown>;
 }
 ```
 
-## Creating a Basic Plugin
+### Extension Types
 
 ```typescript
-// example-plugin.ts
-import { Plugin, registerPlugin } from '@chaycards/core';
+interface DocumentTypeExtension {
+  target: string;            // Document type to extend
+  components?: ComponentExtension[];
+  api?: Record<string, unknown>;
+}
 
-const ExamplePlugin: Plugin = {
-  id: 'com.example.plugin',
-  name: 'Example Plugin',
-  version: '1.0.0',
-  description: 'An example plugin',
-  author: 'Your Name',
-  
-  async onLoad() {
-    // Plugin initialization code
-    console.log('Plugin loaded!');
-  },
-  
-  async onUnload() {
-    // Cleanup code
-    console.log('Plugin unloaded!');
-  }
-};
+interface ViewExtension {
+  target: string;           // View to extend
+  component: React.ComponentType<any>;
+}
 
-registerPlugin(ExamplePlugin);
+interface ComponentExtension {
+  type: 'toolbar' | 'sidebar' | 'menu';
+  component: React.ComponentType<any>;
+}
 ```
 
-## Adding a New Document Type
+## Development Workflow
 
+### Hot Reloading
+Plugins support hot reloading during development:
+1. Start development server: `npm run dev`
+2. Edit plugin code
+3. Changes are automatically reloaded
+
+### Testing
+Plugins use Jest for testing:
 ```typescript
-// flashcard-plugin.ts
-import { Plugin, DocumentType } from '@chaycards/core';
+// my-plugin.test.ts
+import MyPlugin from './my-plugin';
 
-const FlashcardDocument: DocumentType = {
-  type: 'flashcard',
-  name: 'Flashcard Deck',
-  icon: 'card-icon.svg',
-  
-  // Document structure
-  schema: {
-    cards: [{
-      front: 'string',
-      back: 'string',
-      tags: ['string']
-    }]
-  },
-  
-  // Default view component
-  defaultView: FlashcardView,
-  
-  // Additional views
-  views: {
-    study: StudyView,
-    edit: EditView
-  }
-};
+describe('My Plugin', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-const FlashcardPlugin: Plugin = {
-  // ... plugin metadata ...
-  
-  documentTypes: [FlashcardDocument]
-};
+  it('should initialize correctly', async () => {
+    await MyPlugin.onLoad?.();
+    // Add assertions
+  });
+});
 ```
 
-## Extending Existing Document Types
+### Building
+Plugins are automatically included in production builds:
+```bash
+npm run build:vite          # Build application
+npx electron-builder --dir  # Create executable
+```
 
+## Plugin API
+
+### Event System
 ```typescript
-// ai-assistant-plugin.ts
-const AIAssistantPlugin: Plugin = {
+// Subscribe to events
+core.events.on('document:changed', (doc) => {
+  // Handle document changes
+});
+
+// Publish events
+core.events.emit('my-plugin:event', data);
+```
+
+### Extending Document Types
+```typescript
+const MyPlugin: Plugin = {
   // ... plugin metadata ...
   
   extends: {
     documentTypes: [{
-      target: 'markdown',  // Extend markdown documents
-      
-      // Add AI-powered features
+      target: 'markdown',
       components: [{
         type: 'toolbar',
-        component: AIToolbarButton
+        component: MyToolbarButton
       }],
-      
-      // Add AI processing capabilities
       api: {
-        analyzeText: async (text: string) => {
-          // AI processing logic
+        processDocument: async (doc) => {
+          // Custom document processing
         }
       }
     }]
@@ -121,68 +158,85 @@ const AIAssistantPlugin: Plugin = {
 };
 ```
 
-## Plugin Communication
-
+### Adding Views
 ```typescript
-// Using another plugin's API
-const otherPlugin = await core.plugins.get('com.example.other-plugin');
-if (otherPlugin) {
-  const result = await otherPlugin.api.someFunction();
-}
-
-// Event-based communication
-core.events.on('document:changed', (doc) => {
-  // React to document changes
-});
-
-// Publishing events
-core.events.emit('my-plugin:event', data);
+const MyPlugin: Plugin = {
+  // ... plugin metadata ...
+  
+  extends: {
+    views: [{
+      target: 'document-viewer',
+      component: MyCustomView
+    }]
+  }
+};
 ```
 
 ## Best Practices
 
-1. **Version Dependencies**: Clearly specify version requirements for dependencies
-2. **Error Handling**: Gracefully handle missing dependencies or API changes
-3. **Resource Management**: Clean up resources in onUnload
-4. **API Documentation**: Document your plugin's API for other developers
-5. **Performance**: Lazy load resources and avoid blocking operations
+### Plugin Design
+1. Keep plugins focused and modular
+2. Use TypeScript for type safety
+3. Document your plugin's API
+4. Handle errors gracefully
+5. Clean up resources in onUnload
 
-## Testing
+### Testing
+1. Write tests for critical functionality
+2. Mock external dependencies
+3. Test error conditions
+4. Verify cleanup on unload
 
-```typescript
-import { createTestPlugin } from '@chaycards/testing';
+### Performance
+1. Lazy load resources
+2. Minimize startup impact
+3. Cache expensive operations
+4. Profile plugin performance
 
-describe('My Plugin', () => {
-  let plugin;
-  
-  beforeEach(() => {
-    plugin = createTestPlugin(MyPlugin);
-  });
-  
-  it('should initialize correctly', async () => {
-    await plugin.load();
-    expect(plugin.isLoaded).toBe(true);
-  });
-});
+## Debugging
+
+### Development Tools
+- Use React DevTools for components
+- Console logging available
+- TypeScript debugging enabled
+- Source maps supported
+
+### Common Issues
+1. Hot Reload Not Working
+   - Check file paths
+   - Verify plugin structure
+   - Check for syntax errors
+
+2. Type Errors
+   - Verify interface implementation
+   - Check import paths
+   - Update type definitions
+
+3. Runtime Errors
+   - Check error console
+   - Verify dependencies
+   - Test error handling
+
+## Distribution
+
+### Plugin Package Structure
+```
+my-plugin/
+├── dist/           # Compiled code
+├── src/            # Source code
+│   ├── index.ts    # Main entry
+│   └── components/ # React components
+├── test/           # Test files
+└── package.json    # Plugin metadata
 ```
 
-## Publishing
-
-1. Package your plugin:
-```bash
-npm run build-plugin
-```
-
-2. Create a plugin manifest:
+### Plugin Manifest
 ```json
 {
-  "id": "com.example.plugin",
+  "name": "my-plugin",
   "version": "1.0.0",
-  "main": "dist/plugin.js",
+  "main": "dist/index.js",
   "dependencies": {
-    "com.example.other-plugin": "^1.0.0"
+    // Plugin dependencies
   }
 }
-```
-
-3. Submit to the ChayCards marketplace

@@ -5,29 +5,60 @@
   "main": "dist/main/index.js",
   "private": true,
   "scripts": {
-    "dev": "tsc && electron .",
-    "build": "tsc && electron-builder"
+    "dev": "vite",
+    "build": "tsc && vite build && electron-builder --dir",
+    "preview": "vite preview",
+    "test": "jest",
+    "test:plugins": "jest --config plugins/jest.config.js"
   },
   "dependencies": {
+    "chaycards": "file:",
+    "electron-store": "^8.1.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.27.0"
+    "react-router-dom": "^6.27.0"
   },
   "devDependencies": {
+    "@headlessui/react": "^2.2.0",
+    "@heroicons/react": "^2.1.5",
+    "@types/jest": "^29.5.0",
+    "@types/node": "22.8.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.20",
     "electron": "33.0.2",
-    "electron-builder": "25.1.8",
-    "typescript": "5.6.3"
+    "electron-builder": "^24.0.0",
+    "jest": "^29.5.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "ts-jest": "^29.1.0",
+    "typescript": "5.6.3",
+    "vite": "^5.0.0",
+    "vite-plugin-electron": "^0.15.0"
   },
   "build": {
     "appId": "com.chaycards.app",
+    "productName": "ChayCards",
     "directories": {
-      "output": "build"
+      "output": "release"
     },
     "files": [
       "dist/**/*",
       "package.json"
-    ]
+    ],
+    "extraResources": [
+      {
+        "from": "plugins",
+        "to": "plugins",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "dir",
+      "signAndEditExecutable": false
+    }
   }
 }
