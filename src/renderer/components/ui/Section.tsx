@@ -25,7 +25,7 @@ export function Section({ title, badge, children, className = '' }: SectionProps
   return (
     <section className={`space-y-3 ${className}`}>
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold text-text-dark flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-text flex items-center gap-2">
           {title}
           {badge && <span className={getBadgeClasses(badge.variant)}>{badge.text}</span>}
         </h2>

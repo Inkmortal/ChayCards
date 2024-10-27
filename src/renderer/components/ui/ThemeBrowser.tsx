@@ -94,13 +94,13 @@ export function ThemeBrowser({ themes, currentTheme, onThemeSelect }: ThemeBrows
 
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-text bg-opacity-25 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-background bg-opacity-75 transition-opacity"
             onClick={() => setIsOpen(false)}
           />
 
           {/* Modal */}
           <div className="relative min-h-screen flex items-center justify-center p-4">
-            <div className="relative bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col">
+            <div className="relative bg-surface rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col">
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <h2 className="text-lg font-semibold text-text">Choose Theme</h2>
@@ -114,7 +114,7 @@ export function ThemeBrowser({ themes, currentTheme, onThemeSelect }: ThemeBrows
                   </Button>
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="p-2 hover:bg-surface rounded-md text-text-light hover:text-text"
+                    className="p-2 hover:bg-surface-hover rounded-md text-text-light hover:text-text"
                   >
                     <Icon name="plus" className="w-5 h-5 rotate-45" />
                   </button>

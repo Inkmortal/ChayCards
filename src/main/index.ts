@@ -1,10 +1,48 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
+import { loadFolders, saveFolders, restoreFromBackup } from './api/folders';
+
+let mainWindow: BrowserWindow | null = null;
+
+// Register IPC handlers
+function registerIpcHandlers() {
+  console.log('Registering IPC handlers...');
+
+  // First remove any existing handlers
+  ipcMain.removeHandler('load-folders');
+  ipcMain.removeHandler('save-folders');
+  ipcMain.removeHandler('restore-folders');
+
+  // Then register new handlers
+  ipcMain.handle('load-folders', async () => {
+    console.log('load-folders handler called');
+    return await loadFolders();
+  });
+
+  ipcMain.handle('save-folders', async (event, data) => {
+    console.log('save-folders handler called');
+    await saveFolders(data);
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.webContents.send('folders-updated');
+    });
+    return data;
+  });
+
+  ipcMain.handle('restore-folders', async () => {
+    console.log('restore-folders handler called');
+    return await restoreFromBackup();
+  });
+
+  console.log('IPC handlers registered');
+}
 
 function createWindow() {
-  console.log('Creating main window');
-  
-  const win = new BrowserWindow({
+  if (mainWindow !== null) {
+    return;
+  }
+
+  console.log('Creating window...');
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
@@ -14,47 +52,71 @@ function createWindow() {
     }
   });
 
-  // Log when DOM is ready
-  win.webContents.on('dom-ready', () => {
+  mainWindow.webContents.on('dom-ready', () => {
     console.log('DOM ready');
-    // Open DevTools to see console logs
-    win.webContents.openDevTools();
+    if (process.env.NODE_ENV !== 'production') {
+      mainWindow?.webContents.openDevTools();
+    }
   });
 
-  // In development, load from Vite dev server
   if (process.env.NODE_ENV !== 'production') {
-    console.log('Development mode: Loading from Vite dev server');
     const port = process.env.PORT || 5173;
     const url = `http://localhost:${port}`;
-    console.log(`Loading URL: ${url}`);
-    win.loadURL(url);
+    console.log(`Loading dev server: ${url}`);
+    mainWindow.loadURL(url);
   } else {
-    // In production, load the built files
-    console.log('Production mode: Loading built files');
     const indexPath = join(__dirname, '../renderer/index.html');
-    console.log(`Loading file: ${indexPath}`);
-    win.loadFile(indexPath);
+    console.log(`Loading production build: ${indexPath}`);
+    mainWindow.loadFile(indexPath);
   }
 
-  // Log any load errors
-  win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error('Failed to load:', errorCode, errorDescription);
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 
-app.whenReady().then(() => {
-  console.log('App is ready');
-  createWindow();
+// Initialize app
+const init = async () => {
+  try {
+    // Wait for app to be ready
+    await app.whenReady();
+    console.log('App ready');
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
+    // Register IPC handlers first
+    registerIpcHandlers();
+
+    // Create window after handlers are registered
+    createWindow();
+  } catch (error) {
+    console.error('Error during initialization:', error);
+    app.quit();
+  }
+};
+
+// Start initialization
+init().catch(error => {
+  console.error('Failed to initialize app:', error);
+  app.quit();
 });
 
+// Handle app events
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});
+
+// Log any errors
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+});
+
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled rejection:', error);
 });

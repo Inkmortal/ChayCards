@@ -67,10 +67,48 @@ ChayCards is built with extensibility at its core. Our plugin system allows the 
 
 ## 🚀 Getting Started
 
+### Prerequisites
+
+1. Install [Node.js](https://nodejs.org/) (version 16 or higher)
+2. Install [Git](https://git-scm.com/downloads) for your operating system
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/chaycards.git
+cd chaycards
+```
+
+2. Install dependencies:
 ```bash
 npm install
+```
+
+### Running the Application
+
+1. Start the development server:
+```bash
 npm run dev
 ```
+
+2. The application should automatically open in a new window. If you need to access it manually, the development server runs at:
+```
+http://localhost:5173
+```
+
+### Troubleshooting
+
+- If you see `node_modules` related errors, try removing the directory and reinstalling:
+  ```bash
+  rm -rf node_modules
+  npm install
+  ```
+
+- For permission errors on Windows, run PowerShell as Administrator
+- For permission errors on Mac/Linux, you might need to use `sudo`
+
+Need help? Check our [Knowledge Base](docs/knowledge-base.md) or open an issue on GitHub.
 
 ## 📚 Documentation
 

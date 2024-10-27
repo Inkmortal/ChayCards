@@ -1,27 +1,18 @@
-import React, { ReactNode } from 'react';
+import React from 'react';
 
-interface CardProps {
-  children: ReactNode;
+export interface CardProps {
+  children: React.ReactNode;
   className?: string;
+  onClick?: () => void;
   divided?: boolean;
 }
 
-export function Card({ children, className = '', divided = false }: CardProps) {
+export function Card({ children, className = '', onClick, divided }: CardProps) {
   return (
-    <div className={`rounded-lg border border-border bg-surface ${divided ? 'divide-y divide-border' : ''} ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-interface CardItemProps {
-  children: ReactNode;
-  className?: string;
-}
-
-export function CardItem({ children, className = '' }: CardItemProps) {
-  return (
-    <div className={`p-4 ${className}`}>
+    <div 
+      className={`bg-surface rounded-lg shadow-sm ${divided ? 'divide-y divide-border' : ''} ${className}`}
+      onClick={onClick}
+    >
       {children}
     </div>
   );

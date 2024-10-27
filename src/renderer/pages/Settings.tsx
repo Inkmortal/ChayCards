@@ -17,7 +17,7 @@ export function Settings() {
         {/* Appearance Section */}
         <Section title="Appearance">
           <Card>
-            <CardItem>
+            <div className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-medium text-text">Theme</h3>
@@ -31,7 +31,7 @@ export function Settings() {
                 currentTheme={currentTheme}
                 onThemeSelect={changeTheme}
               />
-            </CardItem>
+            </div>
           </Card>
         </Section>
 
@@ -63,10 +63,12 @@ export function Settings() {
         <Section title="About">
           <Card divided>
             <CardItem>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-text">Version</h3>
                 <span className="text-sm text-text-light">0.1.0</span>
               </div>
+            </CardItem>
+            <CardItem>
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-text">Check for Updates</h3>
                 <Button

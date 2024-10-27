@@ -1,67 +1,193 @@
-import React from 'react';
-import { Section, Card, EmptyState, Button } from '../components/ui';
+import React, { useState } from 'react';
+import { 
+  LibraryHeader, 
+  FolderContext, 
+  FolderGrid, 
+  CreateFolderModal,
+  Sidebar,
+  DocumentsSection,
+  FolderConflictModal,
+  RenameModal
+} from '../components/library';
+import { useFolders } from '../hooks/useFolders';
 
 export function Library() {
+  const {
+    folders,
+    currentFolder,
+    currentFolders,
+    breadcrumbPath,
+    isCreateModalOpen,
+    newFolderName,
+    folderError,
+    folderConflict,
+    setFolderConflict,
+    openCreateModal,
+    closeCreateModal,
+    handleCreateFolder,
+    deleteFolder,
+    renameFolder,
+    renameAndMoveFolder,
+    replaceFolder,
+    moveFolder,
+    navigateFolder,
+    navigateBack,
+    navigateToFolder,
+    setNewFolderName,
+    handleInputKeyDown
+  } = useFolders();
+
+  const [itemToRename, setItemToRename] = useState<{
+    id: string;
+    name: string;
+    moveAfter?: { targetId: string | null };
+  } | null>(null);
+
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+
+  const handleRename = async (id: string, newName: string) => {
+    console.log('handleRename called:', { id, newName });
+    const success = await renameFolder(id, newName);
+    console.log('Rename result:', { success });
+    return success;
+  };
+
+  const handleMove = async (sourceId: string, targetId: string | null, skipConflictCheck?: boolean) => {
+    if (isResolvingConflict) {
+      console.log('Conflict resolution in progress, skipping move');
+      return;
+    }
+    console.log('handleMove called:', { sourceId, targetId, skipConflictCheck });
+    await moveFolder(sourceId, targetId, skipConflictCheck);
+  };
+
+  const handleResolveConflict = async (action: 'rename' | 'replace') => {
+    console.log('handleResolveConflict called:', { action, folderConflict });
+    if (!folderConflict) {
+      console.log('No folder conflict to resolve');
+      return;
+    }
+
+    setIsResolvingConflict(true);
+    try {
+      if (action === 'replace') {
+        console.log('Executing replace action');
+        const success = await replaceFolder(folderConflict.sourceId, folderConflict.targetId);
+        if (success) {
+          console.log('Replace completed successfully');
+          setFolderConflict(null);
+        } else {
+          console.error('Replace operation failed');
+        }
+      } else {
+        console.log('Executing rename action');
+        const sourceFolder = folders.find(f => f.id === folderConflict.sourceId);
+        if (sourceFolder) {
+          console.log('Setting up rename with move:', { sourceFolder, targetId: folderConflict.targetId });
+          // Use the suggested name from the conflict
+          setItemToRename({
+            id: sourceFolder.id,
+            name: folderConflict.sourceName,
+            moveAfter: { targetId: folderConflict.targetId }
+          });
+        }
+        setFolderConflict(null);
+      }
+    } finally {
+      setIsResolvingConflict(false);
+    }
+  };
+
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-border">
-        <h1 className="text-2xl font-semibold text-text-dark">Library</h1>
-        <div className="flex items-center gap-3">
-          <Button
-            icon={
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            New Folder
-          </Button>
-          <Button
-            variant="primary"
-            icon={
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            New Document
-          </Button>
+    <div className="flex h-full">
+      <Sidebar
+        folders={folders}
+        selectedId={currentFolder?.id || null}
+        onSelect={navigateToFolder}
+        onCreateFolder={openCreateModal}
+        onMoveFolder={handleMove}
+        onRenameFolder={handleRename}
+      />
+
+      <div className="flex-1 overflow-auto">
+        <div className="p-6 space-y-8">
+          <LibraryHeader onCreateFolder={() => openCreateModal(currentFolder?.id || null)} />
+
+          {currentFolder && (
+            <FolderContext
+              currentFolder={currentFolder}
+              breadcrumbPath={breadcrumbPath}
+              onNavigateBack={navigateBack}
+              onNavigateToFolder={navigateToFolder}
+              onMoveFolder={handleMove}
+            />
+          )}
+
+          <div className="space-y-8">
+            <FolderGrid
+              folders={currentFolders}
+              currentFolder={currentFolder}
+              onCreateFolder={() => openCreateModal(currentFolder?.id || null)}
+              onNavigateFolder={navigateFolder}
+              onDeleteFolder={deleteFolder}
+              onRenameFolder={handleRename}
+              onMoveFolder={handleMove}
+            />
+
+            <DocumentsSection />
+          </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="space-y-8">
-        {/* Folders Section */}
-        <Section 
-          title="Folders"
-          badge={{ text: "0", variant: "secondary" }}
-        >
-          <EmptyState
-            icon={
-              <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            }
-            title="No folders yet"
-          />
-        </Section>
+      <CreateFolderModal
+        isOpen={isCreateModalOpen}
+        onClose={closeCreateModal}
+        folderName={newFolderName}
+        onFolderNameChange={(e) => setNewFolderName(e.target.value)}
+        onKeyDown={handleInputKeyDown}
+        error={folderError}
+        onSubmit={handleCreateFolder}
+      />
 
-        {/* Documents Section */}
-        <Section
-          title="Documents"
-          badge={{ text: "0", variant: "secondary" }}
-        >
-          <EmptyState
-            icon={
-              <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+      <FolderConflictModal
+        isOpen={folderConflict !== null}
+        onClose={() => {
+          setFolderConflict(null);
+          setIsResolvingConflict(false);
+        }}
+        onReplace={() => handleResolveConflict('replace')}
+        onRename={() => handleResolveConflict('rename')}
+        folderName={folderConflict?.sourceName || ''}
+      />
+
+      {itemToRename && (
+        <RenameModal
+          isOpen={true}
+          onClose={() => {
+            console.log('Closing rename modal');
+            setItemToRename(null);
+            setFolderConflict(null);
+            setIsResolvingConflict(false);
+          }}
+          onRename={async (newName: string) => {
+            console.log('Rename modal submit:', { newName, itemToRename });
+            let success = false;
+            if (itemToRename.moveAfter) {
+              success = await renameAndMoveFolder(
+                itemToRename.id,
+                newName,
+                itemToRename.moveAfter.targetId
+              );
+            } else {
+              success = await handleRename(itemToRename.id, newName);
             }
-            title="No documents yet"
-          />
-        </Section>
-      </div>
+            if (success) {
+              setItemToRename(null);
+            }
+          }}
+          currentName={itemToRename.name}
+        />
+      )}
     </div>
   );
 }

@@ -1,57 +1,57 @@
 import type { ThemeColors } from '../themes';
 
 export const draculaTheme: ThemeColors = {
-  // Core Brand Colors
-  primary: '#bd93f9',      // Purple - kept original
-  primaryLight: '#d8b9ff', // Lighter purple for better visibility
-  primaryDark: '#9d71e8',  // Darker purple for contrast
-  primaryBg: '#483d6b',    // Subtle purple background
+  // Core Brand Colors - Using official Dracula colors
+  primary: '#bd93f9',      // Purple as primary
+  primaryLight: '#cfa9fa', // Lighter purple
+  primaryDark: '#ab7af8',  // Darker purple
+  primaryBg: '#44475a',    // Current line color
   
-  secondary: '#6272a4',    // Comment color - kept original
-  secondaryLight: '#7b8abc', // Lighter comment color
-  secondaryDark: '#4c5987', // Darker comment color
-  secondaryBg: '#313341',  // Subtle comment background
+  secondary: '#ff79c6',    // Pink as secondary
+  secondaryLight: '#ff8acd', // Lighter pink
+  secondaryDark: '#ff68bf', // Darker pink
+  secondaryBg: '#44475a',  // Current line color
   
-  accent: '#ff79c6',       // Pink - kept original
-  accentLight: '#ff9cd7',  // Lighter pink
-  accentDark: '#ff56b5',   // Darker pink
-  accentBg: '#6b3d5c',     // Subtle pink background
+  accent: '#8be9fd',       // Cyan as accent
+  accentLight: '#9fecfd',  // Lighter cyan
+  accentDark: '#77e6fd',   // Darker cyan
+  accentBg: '#44475a',     // Current line color
   
-  // UI Colors - Adjusted for better readability
-  background: '#282a36',   // Background - kept original
-  surface: '#313341',      // Slightly lighter than background
-  surfaceHover: '#3b3e4f', // Even lighter for hover states
-  surfaceActive: '#44475a', // Current Line - original dracula
+  // UI Colors - Using official Dracula colors
+  background: '#282a36',   // Background
+  surface: '#2f313d',      // Slightly lighter than background
+  surfaceHover: '#44475a', // Current line color
+  surfaceActive: '#4a4d63', // Slightly lighter than current line
   
-  border: '#44475a',       // Current Line - kept original
-  borderLight: '#4c5166',  // Slightly lighter border
-  borderDark: '#282a36',   // Background color for dark borders
+  border: '#44475a',       // Current line color
+  borderLight: '#4a4d63',  // Slightly lighter than current line
+  borderDark: '#282a36',   // Background color
   
-  // Text Colors - Adjusted for better contrast
-  text: '#f8f8f2',        // Foreground - kept original
-  textLight: '#bfbfbf',   // Lighter than original for better readability
-  textLighter: '#8f8f8f', // Even lighter for subtle text
-  textDark: '#ffffff',    // Pure white for maximum contrast
-  textInverse: '#282a36', // Background color for inverse text
+  // Text Colors - Using official Dracula colors
+  text: '#f8f8f2',        // Foreground
+  textLight: '#6272a4',   // Comment color
+  textLighter: '#6272a4', // Comment color
+  textDark: '#f8f8f2',    // Foreground
+  textInverse: '#282a36', // Background color
   
-  // State Colors - Using Dracula's original colors
-  success: '#50fa7b',     // Green - kept original
-  successLight: '#7bff9c', // Lighter green
-  successDark: '#29f55a', // Darker green
-  successBg: '#3d6b4f',   // Subtle green background
+  // State Colors - Using official Dracula colors
+  success: '#50fa7b',     // Green
+  successLight: '#69fb8f',
+  successDark: '#37f967',
+  successBg: '#44475a',   // Current line color
   
-  warning: '#ffb86c',     // Orange - kept original
-  warningLight: '#ffc88d', // Lighter orange
-  warningDark: '#ffa84b', // Darker orange
-  warningBg: '#6b5d3d',   // Subtle orange background
+  warning: '#ffb86c',     // Orange
+  warningLight: '#ffc281',
+  warningDark: '#ffae57',
+  warningBg: '#44475a',   // Current line color
   
-  error: '#ff5555',       // Red - kept original
-  errorLight: '#ff7777',  // Lighter red
-  errorDark: '#ff3333',   // Darker red
-  errorBg: '#6b3d3d',     // Subtle red background
+  error: '#ff5555',       // Red
+  errorLight: '#ff6a6a',
+  errorDark: '#ff4040',
+  errorBg: '#44475a',     // Current line color
   
-  info: '#8be9fd',        // Cyan - kept original
-  infoLight: '#aceffd',   // Lighter cyan
-  infoDark: '#6ae3fd',    // Darker cyan
-  infoBg: '#3d646b',      // Subtle cyan background
+  info: '#f1fa8c',        // Yellow
+  infoLight: '#f3fb9c',
+  infoDark: '#eff97c',
+  infoBg: '#44475a',      // Current line color
 };
