@@ -87,7 +87,7 @@ export function Library() {
           // Use the suggested name from the conflict
           setItemToRename({
             id: sourceFolder.id,
-            name: folderConflict.sourceName,
+            name: folderConflict.suggestedName,
             moveAfter: { targetId: folderConflict.targetId }
           });
         }
@@ -127,6 +127,7 @@ export function Library() {
             <FolderGrid
               folders={currentFolders}
               currentFolder={currentFolder}
+              allFolders={folders}
               onCreateFolder={() => openCreateModal(currentFolder?.id || null)}
               onNavigateFolder={navigateFolder}
               onDeleteFolder={deleteFolder}
@@ -157,7 +158,7 @@ export function Library() {
         }}
         onReplace={() => handleResolveConflict('replace')}
         onRename={() => handleResolveConflict('rename')}
-        folderName={folderConflict?.sourceName || ''}
+        folderName={folderConflict?.originalName || ''}
       />
 
       {itemToRename && (
@@ -186,6 +187,9 @@ export function Library() {
             }
           }}
           currentName={itemToRename.name}
+          folders={folders}
+          parentId={itemToRename.moveAfter?.targetId || currentFolder?.id || null}
+          itemId={itemToRename.id}
         />
       )}
     </div>

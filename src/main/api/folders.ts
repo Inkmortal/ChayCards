@@ -96,7 +96,7 @@ export async function loadFolders(): Promise<FolderData> {
 }
 
 // Save folders
-export async function saveFolders(data: FolderData): Promise<void> {
+export async function saveFolders(data: FolderData): Promise<FolderData> {
   try {
     console.log('Saving folders:', data);
     await ensureDirectories();
@@ -120,6 +120,9 @@ export async function saveFolders(data: FolderData): Promise<void> {
     
     // Create backup
     await createBackup(updatedData);
+
+    // Return the saved data
+    return updatedData;
   } catch (error) {
     console.error('Error saving folders:', error);
     throw error;

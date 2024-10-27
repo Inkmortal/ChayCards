@@ -14,6 +14,7 @@ interface Folder {
 interface FolderGridProps {
   folders: Folder[];
   currentFolder: Folder | null;
+  allFolders?: Folder[];  // Added to pass complete folder list for validation
   onCreateFolder: () => void;
   onNavigateFolder: (id: string) => void;
   onDeleteFolder: (id: string) => void;
@@ -24,6 +25,7 @@ interface FolderGridProps {
 export function FolderGrid({
   folders,
   currentFolder,
+  allFolders = [],  // Default to empty array if not provided
   onCreateFolder,
   onNavigateFolder,
   onDeleteFolder,
@@ -56,6 +58,8 @@ export function FolderGrid({
         onCreateFolder={onCreateFolder}
         onRename={onRenameFolder}
         onMove={onMoveFolder}
+        folders={allFolders}
+        currentFolderId={currentFolder?.id || null}
       />
     </div>
   );

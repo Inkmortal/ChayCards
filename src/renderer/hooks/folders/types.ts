@@ -9,7 +9,8 @@ export interface Folder {
 export interface FolderConflict {
   sourceId: string;
   targetId: string | null;
-  sourceName: string;
+  originalName: string;  // Original name that caused the conflict
+  suggestedName: string;  // Suggested unique name for resolution
 }
 
 export interface FolderData {

@@ -21,11 +21,11 @@ function registerIpcHandlers() {
 
   ipcMain.handle('save-folders', async (event, data) => {
     console.log('save-folders handler called');
-    await saveFolders(data);
+    const savedData = await saveFolders(data);
     BrowserWindow.getAllWindows().forEach(win => {
       win.webContents.send('folders-updated');
     });
-    return data;
+    return savedData;
   });
 
   ipcMain.handle('restore-folders', async () => {

@@ -12,9 +12,20 @@ interface CardViewProps {
   onCreateFolder: () => void;
   onRename: (id: string, newName: string, moveAfter?: { targetId: string | null }) => void;
   onMove?: (sourceId: string, targetId: string | null, skipConflictCheck?: boolean) => void;
+  folders?: { id: string; name: string; parentId: string | null; }[];
+  currentFolderId?: string | null;
 }
 
-export function CardView({ items = [], onSelect, onDelete, onCreateFolder, onRename, onMove }: CardViewProps) {
+export function CardView({ 
+  items = [], 
+  onSelect, 
+  onDelete, 
+  onCreateFolder, 
+  onRename, 
+  onMove,
+  folders = [],
+  currentFolderId = null
+}: CardViewProps) {
   const [itemToRename, setItemToRename] = useState<Item | null>(null);
   const [pendingMove, setPendingMove] = useState<{
     sourceId: string;
@@ -205,6 +216,9 @@ export function CardView({ items = [], onSelect, onDelete, onCreateFolder, onRen
         onClose={() => setItemToRename(null)}
         onRename={handleRename}
         currentName={itemToRename?.name || ''}
+        folders={folders}
+        parentId={pendingMove ? pendingMove.targetId : currentFolderId}
+        itemId={itemToRename?.id}
       />
 
       <FolderConflictModal

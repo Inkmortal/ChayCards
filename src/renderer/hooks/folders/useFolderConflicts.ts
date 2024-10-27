@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Folder, FolderConflict } from './types';
-import { getAllSubFolders } from './folderUtils';
+import { getAllSubFolders, getUniqueFolderName } from './folderUtils';
 
 interface UseFolderConflictsReturn {
   folderConflict: FolderConflict | null;
@@ -25,10 +25,14 @@ export function useFolderConflicts(): UseFolderConflictsReturn {
     );
 
     if (hasDuplicate) {
+      // Generate a unique name for the conflicting folder
+      const uniqueName = getUniqueFolderName(folders, sourceFolder.name, targetId);
+      
       setFolderConflict({
         sourceId,
         targetId,
-        sourceName: sourceFolder.name
+        originalName: sourceFolder.name,  // Keep track of the original name
+        suggestedName: uniqueName  // Store the suggested unique name
       });
       return true;
     }
