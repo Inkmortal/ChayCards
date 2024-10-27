@@ -1,6 +1,7 @@
 import { Theme, ThemeColors } from './types';
 import { defaultTheme } from './default';
 import { draculaTheme } from './dracula';
+import { chayLightTheme, chayDarkTheme } from './chay-themes';
 import {
   loadThemes,
   saveTheme,
@@ -37,6 +38,51 @@ export function applyTheme(themeId: string) {
   // Apply variables with transition
   root.style.cssText = variables;
 }
+
+// Create theme objects
+const defaultThemeComplete: Theme = {
+  id: 'default',
+  name: 'Default Theme',
+  description: 'The default light theme for ChayCards',
+  author: 'ChayCards',
+  version: '1.0.0',
+  isBuiltin: true,
+  colors: defaultTheme
+};
+
+const draculaThemeComplete: Theme = {
+  id: 'dracula',
+  name: 'Dracula Theme',
+  description: 'Dark theme based on the Dracula color scheme',
+  author: 'ChayCards',
+  version: '1.0.0',
+  isBuiltin: true,
+  colors: draculaTheme
+};
+
+const chayLight: Theme = {
+  id: 'chay-light',
+  name: "Chay's Light Theme",
+  description: "A light theme featuring Chay's signature colors with focus on readability",
+  author: "ChayCards",
+  version: "1.0.0",
+  isBuiltin: true,
+  colors: chayLightTheme
+};
+
+const chayDark: Theme = {
+  id: 'chay-dark',
+  name: "Chay's Dark Theme",
+  description: "A dark theme featuring Chay's signature colors with focus on readability",
+  author: "ChayCards",
+  version: "1.0.0",
+  isBuiltin: true,
+  colors: chayDarkTheme
+};
+
+// Initialize built-in themes in storage
+const builtInThemes = [defaultThemeComplete, draculaThemeComplete, chayLight, chayDark];
+builtInThemes.forEach(theme => saveTheme(theme));
 
 export type { Theme, ThemeColors };
 export {

@@ -48,7 +48,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
           {currentFolders.map((folder) => (
             <Card
               key={folder.id}
-              className="cursor-pointer hover:border-blue-500 transition-colors"
+              className="cursor-pointer hover:border-primary transition-colors"
               onClick={() => onNavigateFolder(folder.id)}
             >
               <div className="flex items-center justify-between p-4">

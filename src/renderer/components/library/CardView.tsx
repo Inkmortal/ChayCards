@@ -149,7 +149,7 @@ export function CardView({
           <div
             key={item.id}
             className={`group relative bg-gradient-to-br from-background to-surface rounded-lg shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer h-40
-              ${dragState.dragOverItem === item.id ? 'ring-2 ring-secondary/50 bg-secondary/10 folder-receiving' : 'hover:scale-[1.02]'}
+              ${dragState.dragOverItem === item.id ? 'ring-2 ring-primary/50 bg-primary/10 folder-receiving' : 'hover:scale-[1.02]'}
               ${dragState.draggedItem === item.id ? 'opacity-50' : ''}`}
             onClick={() => onSelect(item.id)}
             draggable={item.type === 'folder'}
@@ -159,7 +159,7 @@ export function CardView({
             onDrop={(e) => handleDrop(e, item.id)}
             onDragEnd={handleDragEnd}
           >
-            <div className="absolute inset-0 rounded-lg ring-1 ring-border/50 group-hover:ring-secondary/30" />
+            <div className="absolute inset-0 rounded-lg ring-1 ring-primary/50 group-hover:ring-primary/30" />
             <div className="flex h-full">
               <div className="w-40 flex items-center justify-center">
                 {item.type === 'folder' ? (
@@ -190,7 +190,7 @@ export function CardView({
                   className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-surface/80 rounded-md transition-all z-10"
                   title="Rename folder"
                 >
-                  <Icon name="pencil" className="w-4 h-4 text-text-light hover:text-secondary transition-colors" />
+                  <Icon name="pencil" className="w-4 h-4 text-text-light hover:text-primary transition-colors" />
                 </button>
                 <button
                   onClick={() => onDelete(item.id)}
@@ -202,7 +202,7 @@ export function CardView({
               </div>
               {/* Drop indicator */}
               {dragState.dragOverItem === item.id && dragState.draggedItem !== item.id && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-secondary/20 text-secondary font-medium px-2 py-1 rounded shadow-sm text-sm z-20">
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-primary/20 text-primary font-medium px-2 py-1 rounded shadow-sm text-sm z-20">
                   Move into folder
                 </div>
               )}
