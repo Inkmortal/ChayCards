@@ -70,10 +70,10 @@ export function TreeNode({
   return (
     <>
       <div
-        className={`group flex items-center py-1.5 px-2 text-sm rounded-md cursor-pointer transition-all duration-150 ${
+        className={`group flex items-center py-1.5 px-2 text-sm rounded-md cursor-pointer transition-all duration-300 ${
           selectedId === item.id 
-            ? 'bg-primary/10 text-primary font-medium shadow-sm' 
-            : 'hover:bg-surface-hover text-text-dark hover:text-text'
+            ? 'bg-primary-bg text-primary font-medium' 
+            : 'hover:bg-surface text-text hover:text-secondary'
         } ${isDragOver ? 'ring-2 ring-secondary/50 bg-secondary/5' : ''}`}
         style={{ paddingLeft: `${level * 12}px` }}
         onClick={() => onSelect(item.id)}
@@ -87,10 +87,10 @@ export function TreeNode({
       >
         <Icon 
           name="folder"
-          className={`flex-shrink-0 w-4 h-4 mr-2 transition-colors ${
+          className={`flex-shrink-0 w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110 ${
             selectedId === item.id 
               ? 'text-primary' 
-              : 'text-text-lighter group-hover:text-text-light'
+              : 'text-primary group-hover:text-secondary'
           }`} 
         />
         <div className="flex items-center min-w-0 flex-1">
@@ -101,12 +101,12 @@ export function TreeNode({
                 e.stopPropagation();
                 setIsExpanded(!isExpanded);
               }}
-              className={`ml-1 w-4 h-4 flex items-center justify-center transition-all duration-150 ${
+              className={`ml-1 w-4 h-4 flex items-center justify-center transition-all duration-300 ${
                 isExpanded ? 'transform rotate-90' : ''
               } ${
                 selectedId === item.id 
                   ? 'text-primary' 
-                  : 'text-text-lighter group-hover:text-text-light'
+                  : 'text-text-light group-hover:text-secondary'
               }`}
             >
               <Icon 
@@ -121,14 +121,14 @@ export function TreeNode({
             e.stopPropagation();
             onCreateFolder(item.id);
           }}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-surface-active rounded-md transition-all ml-2"
+          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-surface-hover rounded-md transition-all duration-300 ml-2"
           title="Create subfolder"
         >
-          <Icon name="plus" className="w-3.5 h-3.5 text-text-lighter group-hover:text-primary" />
+          <Icon name="plus" className="w-3.5 h-3.5 text-text-light hover:text-secondary" />
         </button>
       </div>
       {hasChildren && isExpanded && (
-        <div className="transition-all duration-150">
+        <div className="transition-all duration-300">
           {children.map(child => (
             <TreeNode
               key={child.id}

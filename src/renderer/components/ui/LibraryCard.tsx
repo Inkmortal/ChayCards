@@ -29,7 +29,7 @@ export function LibraryCard({
                   className="w-5 h-5"
                 />
               </div>
-              <span className="font-medium text-text group-hover:text-secondary transition-colors">
+              <span className="font-medium text-text group-hover:text-primary transition-colors">
                 {title}
               </span>
             </div>

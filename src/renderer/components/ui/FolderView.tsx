@@ -53,15 +53,15 @@ export const FolderView: React.FC<FolderViewProps> = ({
             >
               <div className="flex items-center justify-between p-4">
                 <div className="flex items-center space-x-3">
-                  <Icon name="folder" className="text-gray-400" />
-                  <span>{folder.name}</span>
+                  <Icon name="folder" className="text-text-light" />
+                  <span className="text-text">{folder.name}</span>
                 </div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteFolder(folder.id);
                   }}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
+                  className="text-text-light hover:text-error transition-colors"
                 >
                   <Icon name="trash" />
                 </button>

@@ -2,27 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme variables are set by the theme system */
 :root {
-  /* Core Brand Colors */
-  --chay-primary: #0ea5e9;
-  --chay-secondary: #64748b;
-  --chay-accent: #d946ef;
-  
-  /* UI Colors */
-  --chay-background: #ffffff;
-  --chay-surface: #f8f9fa;
-  --chay-border: #e2e8f0;
-  
-  /* Text Colors */
-  --chay-text: #1e293b;
-  --chay-text-light: #64748b;
-  --chay-text-inverse: #ffffff;
-  
-  /* State Colors */
-  --chay-success: #22c55e;
-  --chay-warning: #f59e0b;
-  --chay-error: #ef4444;
-  --chay-info: #3b82f6;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* Theme transition */
@@ -66,7 +52,7 @@
     @apply bg-primary text-text-inverse shadow-sm hover:opacity-90 focus:ring-2 focus:ring-primary focus:ring-opacity-20 focus:outline-none;
   }
   .btn-secondary {
-    @apply bg-surface text-text hover:bg-surface-hover active:bg-surface-active border border-border shadow-sm hover:shadow focus:ring-2 focus:ring-secondary focus:ring-opacity-20 focus:outline-none;
+    @apply bg-surface text-text hover:bg-surface-hover active:bg-surface-active border border-border shadow-sm hover:shadow focus:ring-2 focus:ring-primary focus:ring-opacity-20 focus:outline-none;
   }
   .input {
     @apply block w-full rounded-md border-border bg-surface px-4 py-2 text-text focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-20 shadow-sm;
