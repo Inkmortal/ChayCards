@@ -1,9 +1,9 @@
-import { Folder } from '../hooks/folders/types';
+import { Folder } from '../../renderer/hooks/folders/types';
 
 export interface OperationResult<T = void> {
   success: boolean;
-  data?: T;
   error?: string;
+  data?: T;
 }
 
 export interface CreateFolderData {
@@ -26,16 +26,4 @@ export interface FolderOperationsType {
   moveFolder: (data: MoveFolderData, folders: Folder[]) => Promise<OperationResult>;
   renameFolder: (data: RenameFolderData, folders: Folder[]) => Promise<OperationResult>;
   deleteFolder: (id: string, folders: Folder[]) => Promise<OperationResult>;
-}
-
-// Add interfaces for testing
-export interface FolderServiceMock {
-  createFolder: jest.Mock<Promise<OperationResult<Folder>>>;
-  moveFolder: jest.Mock<Promise<OperationResult>>;
-  renameFolder: jest.Mock<Promise<OperationResult>>;
-  deleteFolder: jest.Mock<Promise<OperationResult>>;
-}
-
-export interface TestFolder extends Folder {
-  children?: TestFolder[];
 }

@@ -84,7 +84,6 @@ export function Library() {
         const sourceFolder = folders.find(f => f.id === folderConflict.sourceId);
         if (sourceFolder) {
           console.log('Setting up rename with move:', { sourceFolder, targetId: folderConflict.targetId });
-          // Use the suggested name from the conflict
           setItemToRename({
             id: sourceFolder.id,
             name: folderConflict.suggestedName,
@@ -120,6 +119,7 @@ export function Library() {
               onNavigateBack={navigateBack}
               onNavigateToFolder={navigateToFolder}
               onMoveFolder={handleMove}
+              onRenameFolder={handleRename}
             />
           )}
 

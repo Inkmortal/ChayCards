@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Folder } from './types';
-import { saveFoldersToApi } from './api';
+import { FolderOperations } from '../../../core/operations/folders';
+import { ElectronStorage } from '../../../services/storage/electron';
 
 interface UseCreateFolderProps {
   folders: Folder[];
@@ -20,11 +21,15 @@ interface UseCreateFolderReturn {
 }
 
 export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): UseCreateFolderReturn {
+  // UI State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderError, setFolderError] = useState<string | undefined>();
   const [createInFolderId, setCreateInFolderId] = useState<string | null>(null);
 
+  const operations = new FolderOperations(new ElectronStorage());
+
+  // UI Event Handlers
   const openCreateModal = (parentId?: string | null) => {
     setIsCreateModalOpen(true);
     setNewFolderName('');
@@ -47,31 +52,18 @@ export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): 
       return;
     }
 
-    const isDuplicate = folders.some(
-      (folder: Folder) => 
-        folder.parentId === createInFolderId && 
-        folder.name.toLowerCase() === trimmedName.toLowerCase()
-    );
-
-    if (isDuplicate) {
-      setFolderError('A folder with this name already exists');
-      return;
-    }
-
     try {
-      const now = new Date().toISOString();
-      const newFolder: Folder = {
-        id: Date.now().toString(),
-        name: trimmedName,
-        parentId: createInFolderId,
-        createdAt: now,
-        modifiedAt: now,
-      };
+      const result = await operations.createFolder(
+        { name: trimmedName, parentId: createInFolderId },
+        folders
+      );
 
-      console.log('Creating new folder:', newFolder);
-      const updatedFolders = [...folders, newFolder];
-      const savedFolders = await saveFoldersToApi(updatedFolders);
-      setFolders(savedFolders);
+      if (!result.success || !result.data) {
+        setFolderError(result.error || 'Failed to create folder');
+        return;
+      }
+
+      setFolders([...folders, result.data]);
       closeCreateModal();
     } catch (error) {
       console.error('Error in handleCreateFolder:', error);

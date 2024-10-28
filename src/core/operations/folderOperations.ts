@@ -1,4 +1,4 @@
-import { Folder } from '../hooks/folders/types';
+import { Folder } from '../../renderer/hooks/folders/types';
 import { 
   OperationResult,
   CreateFolderData,
@@ -6,8 +6,16 @@ import {
   RenameFolderData,
   FolderOperationsType
 } from './types';
+import { StorageInterface } from '../storage/types';
+import { ElectronStorage } from '../../services/storage/electron';
 
 export class FolderOperations implements FolderOperationsType {
+  private storage: StorageInterface;
+
+  constructor() {
+    this.storage = new ElectronStorage();
+  }
+
   private async validateFolderName(
     name: string,
     parentId: string | null,
@@ -34,8 +42,6 @@ export class FolderOperations implements FolderOperationsType {
         };
       }
 
-      // Here we'll integrate with the actual folder creation service
-      // For now, returning a mock implementation
       const newFolder: Folder = {
         id: Date.now().toString(),
         name: data.name,
@@ -43,6 +49,10 @@ export class FolderOperations implements FolderOperationsType {
         createdAt: new Date().toISOString(),
         modifiedAt: new Date().toISOString()
       };
+
+      // Add to folders and save
+      const updatedFolders = [...folders, newFolder];
+      await this.storage.saveFolders(updatedFolders);
 
       return {
         success: true,
@@ -77,7 +87,15 @@ export class FolderOperations implements FolderOperationsType {
         };
       }
 
-      // Here we'll integrate with the actual folder move service
+      // Update folder's parent and save
+      const updatedFolders = folders.map(folder => 
+        folder.id === data.sourceId
+          ? { ...folder, parentId: data.targetId, modifiedAt: new Date().toISOString() }
+          : folder
+      );
+      
+      await this.storage.saveFolders(updatedFolders);
+
       return {
         success: true
       };
@@ -110,7 +128,15 @@ export class FolderOperations implements FolderOperationsType {
         };
       }
 
-      // Here we'll integrate with the actual folder rename service
+      // Update folder name and save
+      const updatedFolders = folders.map(f => 
+        f.id === data.id
+          ? { ...f, name: data.newName, modifiedAt: new Date().toISOString() }
+          : f
+      );
+      
+      await this.storage.saveFolders(updatedFolders);
+
       return {
         success: true
       };
@@ -132,7 +158,10 @@ export class FolderOperations implements FolderOperationsType {
         };
       }
 
-      // Here we'll integrate with the actual folder deletion service
+      // Remove folder and save
+      const updatedFolders = folders.filter(f => f.id !== id);
+      await this.storage.saveFolders(updatedFolders);
+
       return {
         success: true
       };

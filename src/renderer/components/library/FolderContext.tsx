@@ -1,5 +1,6 @@
 import React, { DragEvent, useState, useEffect } from 'react';
 import { Icon } from '../ui';
+import { RenameModal } from './RenameModal';
 
 interface Folder {
   id: string;
@@ -13,6 +14,7 @@ interface FolderContextProps {
   onNavigateBack: () => void;
   onNavigateToFolder: (id: string | null) => void;
   onMoveFolder?: (sourceId: string, targetId: string | null) => void;
+  onRenameFolder?: (id: string, newName: string) => Promise<boolean>;
 }
 
 export function FolderContext({ 
@@ -20,14 +22,16 @@ export function FolderContext({
   breadcrumbPath,
   onNavigateBack,
   onNavigateToFolder,
-  onMoveFolder
+  onMoveFolder,
+  onRenameFolder
 }: FolderContextProps) {
   const [showFullPath, setShowFullPath] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [breadcrumbDragOverId, setBreadcrumbDragOverId] = useState<string | null>(null);
   const [isDraggingOverBreadcrumb, setIsDraggingOverBreadcrumb] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
 
-  // Add global drag event handlers
   useEffect(() => {
     const handleGlobalDragEnd = () => {
       setIsDraggingOverBreadcrumb(false);
@@ -72,7 +76,15 @@ export function FolderContext({
     setIsDraggingOverBreadcrumb(false);
   };
 
-  // Function to render path items
+  const handleRename = async (newName: string) => {
+    if (onRenameFolder) {
+      const success = await onRenameFolder(currentFolder.id, newName);
+      if (success) {
+        setShowRenameModal(false);
+      }
+    }
+  };
+
   const renderPathItems = () => {
     const items = [
       <div
@@ -88,7 +100,6 @@ export function FolderContext({
       </div>
     ];
 
-    // Show the last 3 folders by default, or all if showing full path
     const visibleCount = 3;
     const pathToShow = showFullPath 
       ? breadcrumbPath 
@@ -110,6 +121,7 @@ export function FolderContext({
     }
 
     pathToShow.forEach((folder, index) => {
+      const isLast = index === pathToShow.length - 1;
       items.push(
         <span key={`separator-${folder.id}`} className="text-text-lighter">/</span>
       );
@@ -120,13 +132,26 @@ export function FolderContext({
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, folder.id)}
           onClick={() => onNavigateToFolder(folder.id)}
-          className={`px-2 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer breadcrumb-item
-            ${index === pathToShow.length - 1 
+          onMouseEnter={() => isLast && setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer breadcrumb-item
+            ${isLast 
               ? 'text-secondary font-medium' 
               : 'text-text-light hover:text-secondary hover:bg-surface/80'}
             ${isDraggingOverBreadcrumb && breadcrumbDragOverId === folder.id ? 'bg-secondary/10 ring-1 ring-secondary/30' : ''}`}
         >
-          {folder.name}
+          <span>{folder.name}</span>
+          {isLast && isHovering && !isDraggingOverBreadcrumb && onRenameFolder && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRenameModal(true);
+              }}
+              className="flex items-center justify-center w-5 h-5 rounded hover:bg-surface/80"
+            >
+              <Icon name="pencil" className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       );
     });
@@ -151,6 +176,18 @@ export function FolderContext({
           {renderPathItems()}
         </div>
       </div>
+
+      {showRenameModal && (
+        <RenameModal
+          isOpen={showRenameModal}
+          onClose={() => setShowRenameModal(false)}
+          onRename={handleRename}
+          currentName={currentFolder.name}
+          folders={breadcrumbPath}
+          parentId={currentFolder.parentId}
+          itemId={currentFolder.id}
+        />
+      )}
     </div>
   );
 }
