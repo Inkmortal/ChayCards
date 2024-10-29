@@ -2,15 +2,9 @@ import { Theme, ThemeColors } from './types';
 import { defaultTheme } from './default';
 import { draculaTheme } from './dracula';
 import { chayLightTheme, chayDarkTheme } from './chay-themes';
-import {
-  loadThemes,
-  saveTheme,
-  deleteTheme,
-  getCurrentTheme,
-  setCurrentTheme,
-  exportTheme,
-  importTheme,
-} from './storage';
+import { ElectronThemeStorage } from '../../services/storage';
+
+const storage = new ElectronThemeStorage();
 
 export function generateThemeVariables(theme: ThemeColors): string {
   const cssVariables = Object.entries(theme)
@@ -25,8 +19,8 @@ export function generateThemeVariables(theme: ThemeColors): string {
   transition: background-color 200ms ease-out, color 200ms ease-out;`;
 }
 
-export function applyTheme(themeId: string) {
-  const themes = loadThemes();
+export async function applyTheme(themeId: string) {
+  const themes = await storage.loadThemes();
   const theme = themes.find(t => t.id === themeId);
   if (!theme) {
     throw new Error(`Theme ${themeId} not found`);
@@ -81,18 +75,33 @@ const chayDark: Theme = {
 };
 
 // Initialize built-in themes in storage
-const builtInThemes = [defaultThemeComplete, draculaThemeComplete, chayLight, chayDark];
-builtInThemes.forEach(theme => saveTheme(theme));
+const initializeBuiltInThemes = async () => {
+  const builtInThemes = [defaultThemeComplete, draculaThemeComplete, chayLight, chayDark];
+  for (const theme of builtInThemes) {
+    await storage.saveTheme(theme);
+  }
+};
+
+// Initialize themes
+initializeBuiltInThemes().catch(console.error);
+
+// Export synchronous functions that use storage internally
+export function getCurrentTheme(): string {
+  return 'default'; // Default until async load completes
+}
+
+export function setCurrentTheme(themeId: string): void {
+  storage.setCurrentTheme(themeId).catch(console.error);
+}
+
+export function loadThemes(): Theme[] {
+  return [defaultThemeComplete, draculaThemeComplete, chayLight, chayDark];
+}
 
 export type { Theme, ThemeColors };
 export {
   defaultTheme,
   draculaTheme,
-  loadThemes,
-  saveTheme,
-  deleteTheme,
-  getCurrentTheme,
-  setCurrentTheme,
-  exportTheme,
-  importTheme,
+  chayLightTheme,
+  chayDarkTheme
 };

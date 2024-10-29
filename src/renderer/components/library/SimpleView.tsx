@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { EmptyState, Button, Icon } from '../ui';
+import React from 'react';
+import { Icon, EmptyState, Button } from '../ui';
 import { RenameModal } from './RenameModal';
 import { FolderConflictModal } from './FolderConflictModal';
 import { ListItem } from './ListItem';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import { Item } from './types';
+import { Folder } from '../../../core/storage/folders/models';
+import { FolderConflict } from '../../../core/operations/folders/conflicts';
 
 interface SimpleViewProps {
   items: Item[];
@@ -13,29 +15,44 @@ interface SimpleViewProps {
   onCreateFolder: () => void;
   onRename: (id: string, newName: string, moveAfter?: { targetId: string | null }) => void;
   onMove?: (sourceId: string, targetId: string | null, skipConflictCheck?: boolean) => void;
+  folders?: Folder[];
+  currentFolderId?: string | null;
+  folderConflict?: FolderConflict | null;
+  onConflictResolve?: {
+    replace: () => void;
+    rename: () => void;
+    cancel: () => void;
+  };
+  itemToRename: Item | null;
+  setItemToRename: (item: Item | null) => void;
+  pendingMove: { sourceId: string; targetId: string | null } | null;
+  setPendingMove: (move: { sourceId: string; targetId: string | null } | null) => void;
 }
 
-export function SimpleView({ items = [], onSelect, onDelete, onCreateFolder, onRename, onMove }: SimpleViewProps) {
-  const [itemToRename, setItemToRename] = useState<Item | null>(null);
-  const [pendingMove, setPendingMove] = useState<{
-    sourceId: string;
-    targetId: string | null;
-  } | null>(null);
-  
+export function SimpleView({ 
+  items = [], 
+  onSelect, 
+  onDelete, 
+  onCreateFolder, 
+  onRename, 
+  onMove,
+  folders = [],
+  currentFolderId = null,
+  folderConflict = null,
+  onConflictResolve,
+  itemToRename,
+  setItemToRename,
+  pendingMove,
+  setPendingMove
+}: SimpleViewProps) {
   const {
     dragState,
-    folderConflict,
-    setFolderConflict,
     handleDragStart,
     handleDragOver,
     handleDragLeave,
     handleDrop,
-    handleDragEnd,
-    handleConflictReplace
-  } = useDragAndDrop({ 
-    items, 
-    onMove
-  });
+    handleDragEnd
+  } = useDragAndDrop({ onMove });
 
   if (items.length === 0) {
     return (
@@ -64,11 +81,11 @@ export function SimpleView({ items = [], onSelect, onDelete, onCreateFolder, onR
         });
         setItemToRename({
           ...sourceItem,
-          name: folderConflict.sourceName
+          name: folderConflict.suggestedName
         });
       }
     }
-    setFolderConflict(null);
+    onConflictResolve?.rename?.();
   };
 
   const handleRename = (newName: string) => {
@@ -81,11 +98,6 @@ export function SimpleView({ items = [], onSelect, onDelete, onCreateFolder, onR
       onRename(itemToRename.id, newName);
     }
     setItemToRename(null);
-  };
-
-  const handleCloseRename = () => {
-    setItemToRename(null);
-    setPendingMove(null);
   };
 
   return (
@@ -122,17 +134,20 @@ export function SimpleView({ items = [], onSelect, onDelete, onCreateFolder, onR
 
       <RenameModal
         isOpen={itemToRename !== null}
-        onClose={handleCloseRename}
+        onClose={() => setItemToRename(null)}
         onRename={handleRename}
         currentName={itemToRename?.name || ''}
+        folders={folders}
+        parentId={pendingMove ? pendingMove.targetId : currentFolderId}
+        itemId={itemToRename?.id}
       />
 
       <FolderConflictModal
         isOpen={folderConflict !== null}
-        onClose={() => setFolderConflict(null)}
-        onReplace={handleConflictReplace}
+        onClose={() => onConflictResolve?.cancel?.()}
+        onReplace={() => onConflictResolve?.replace?.()}
         onRename={handleConflictRename}
-        folderName={folderConflict?.sourceName || ''}
+        folderName={folderConflict?.originalName || ''}
       />
     </>
   );

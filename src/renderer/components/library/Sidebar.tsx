@@ -1,13 +1,26 @@
 import React, { useState } from 'react';
 import { Icon, TreeView } from '../ui';
+import { Folder } from '../../../core/storage/folders/models';
+import { FolderConflict } from '../../../core/operations/folders/conflicts';
+import { Item } from './types';
 
 interface SidebarProps {
-  folders: any[];
+  folders: Folder[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onCreateFolder: (parentId: string | null) => void;
   onMoveFolder?: (sourceId: string, targetId: string | null) => void;
   onRenameFolder?: (id: string, newName: string) => void;
+  folderConflict?: FolderConflict | null;
+  onConflictResolve?: {
+    replace: () => void;
+    rename: () => void;
+    cancel: () => void;
+  };
+  itemToRename: Item | null;
+  setItemToRename: (item: Item | null) => void;
+  pendingMove: { sourceId: string; targetId: string | null } | null;
+  setPendingMove: (move: { sourceId: string; targetId: string | null } | null) => void;
 }
 
 export function Sidebar({ 
@@ -16,7 +29,13 @@ export function Sidebar({
   onSelect, 
   onCreateFolder, 
   onMoveFolder,
-  onRenameFolder 
+  onRenameFolder,
+  folderConflict,
+  onConflictResolve,
+  itemToRename,
+  setItemToRename,
+  pendingMove,
+  setPendingMove
 }: SidebarProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -62,6 +81,12 @@ export function Sidebar({
               onCreateFolder={onCreateFolder}
               onMove={onMoveFolder}
               onRename={onRenameFolder}
+              folderConflict={folderConflict}
+              onConflictResolve={onConflictResolve}
+              itemToRename={itemToRename}
+              setItemToRename={setItemToRename}
+              pendingMove={pendingMove}
+              setPendingMove={setPendingMove}
             />
           </div>
         </>

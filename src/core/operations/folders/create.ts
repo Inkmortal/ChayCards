@@ -1,4 +1,4 @@
-import { Folder } from '../../../renderer/hooks/folders/types';
+import { Folder } from '../../../core/storage/folders/models';
 import { CreateFolderData, OperationResult } from '../types';
 import { StorageInterface } from '../../storage/types';
 import { validateFolderName } from './validation';

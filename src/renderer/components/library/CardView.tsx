@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Icon, EmptyState, Button } from '../ui';
 import { RenameModal } from './RenameModal';
 import { FolderConflictModal } from './FolderConflictModal';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import { Item } from './types';
+import { Folder } from '../../../core/storage/folders/models';
+import { FolderConflict } from '../../../core/operations/folders/conflicts';
 
 interface CardViewProps {
   items: Item[];
@@ -12,8 +14,18 @@ interface CardViewProps {
   onCreateFolder: () => void;
   onRename: (id: string, newName: string, moveAfter?: { targetId: string | null }) => void;
   onMove?: (sourceId: string, targetId: string | null, skipConflictCheck?: boolean) => void;
-  folders?: { id: string; name: string; parentId: string | null; }[];
+  folders?: Folder[];
   currentFolderId?: string | null;
+  folderConflict?: FolderConflict | null;
+  onConflictResolve?: {
+    replace: () => void;
+    rename: () => void;
+    cancel: () => void;
+  };
+  itemToRename: Item | null;
+  setItemToRename: (item: Item | null) => void;
+  pendingMove: { sourceId: string; targetId: string | null } | null;
+  setPendingMove: (move: { sourceId: string; targetId: string | null } | null) => void;
 }
 
 export function CardView({ 
@@ -24,28 +36,22 @@ export function CardView({
   onRename, 
   onMove,
   folders = [],
-  currentFolderId = null
+  currentFolderId = null,
+  folderConflict = null,
+  onConflictResolve,
+  itemToRename,
+  setItemToRename,
+  pendingMove,
+  setPendingMove
 }: CardViewProps) {
-  const [itemToRename, setItemToRename] = useState<Item | null>(null);
-  const [pendingMove, setPendingMove] = useState<{
-    sourceId: string;
-    targetId: string | null;
-  } | null>(null);
-
   const {
     dragState,
-    folderConflict,
-    setFolderConflict,
     handleDragStart,
     handleDragOver,
     handleDragLeave,
     handleDrop,
-    handleDragEnd,
-    handleConflictReplace
-  } = useDragAndDrop({ 
-    items, 
-    onMove
-  });
+    handleDragEnd
+  } = useDragAndDrop({ onMove });
 
   if (items.length === 0) {
     return (
@@ -102,11 +108,11 @@ export function CardView({
         });
         setItemToRename({
           ...sourceItem,
-          name: folderConflict.sourceName
+          name: folderConflict.suggestedName
         });
       }
     }
-    setFolderConflict(null);
+    onConflictResolve?.rename?.();
   };
 
   const handleRename = (newName: string) => {
@@ -229,10 +235,10 @@ export function CardView({
 
       <FolderConflictModal
         isOpen={folderConflict !== null}
-        onClose={() => setFolderConflict(null)}
-        onReplace={handleConflictReplace}
+        onClose={() => onConflictResolve?.cancel?.()}
+        onReplace={() => onConflictResolve?.replace?.()}
         onRename={handleConflictRename}
-        folderName={folderConflict?.sourceName || ''}
+        folderName={folderConflict?.originalName || ''}
       />
     </>
   );

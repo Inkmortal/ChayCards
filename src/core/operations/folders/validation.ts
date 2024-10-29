@@ -1,4 +1,4 @@
-import { Folder } from '../../../renderer/hooks/folders/types';
+import { Folder } from '../../../core/storage/folders/models';
 
 export async function validateFolderName(
   name: string,

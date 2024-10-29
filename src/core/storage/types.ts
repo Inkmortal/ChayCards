@@ -1,4 +1,4 @@
-import { Folder } from '../../renderer/hooks/folders/types';
+import { Folder } from './folders/models';
 
 export interface StorageInterface {
   loadFolders(): Promise<Folder[]>;

@@ -1,9 +1,13 @@
-import { Folder, FolderConflict } from './types';
-import { useFolderCore } from './useFolderCore';
+import { Folder } from '../../../core/storage/folders/models';
 import { useFolderConflicts } from './useFolderConflicts';
-import { getAllSubFolders, getUniqueFolderName } from './folderUtils';
+import { getAllSubFolders } from './folderUtils';
 import { FolderOperations } from '../../../core/operations/folders';
-import { ElectronStorage } from '../../../services/storage/electron';
+import { ElectronFolderStorage } from '../../../services/storage';
+import { 
+  FolderConflictResult, 
+  NameConflictResult,
+  FolderConflict
+} from '../../../core/operations/folders/conflicts';
 
 interface UseFolderOperationsProps {
   folders: Folder[];
@@ -29,44 +33,35 @@ export function useFolderOperations({
   currentFolderId,
   setCurrentFolderId
 }: UseFolderOperationsProps): UseFolderOperationsReturn {
-  const operations = new FolderOperations(new ElectronStorage());
+  const operations = new FolderOperations(new ElectronFolderStorage());
+  const { folderConflict, setFolderConflict } = useFolderConflicts();
 
-  const {
-    renameAndMoveFolder: coreRenameAndMoveFolder,
-    replaceFolder
-  } = useFolderCore({
-    folders,
-    setFolders,
-    currentFolderId,
-    setCurrentFolderId
-  });
-
-  const {
-    folderConflict,
-    setFolderConflict,
-    checkFolderConflict
-  } = useFolderConflicts();
+  const handleConflict = (conflict: FolderConflictResult, sourceId: string, targetId: string | null) => {
+    if (conflict.type === 'name') {
+      const nameConflict = conflict as NameConflictResult;
+      setFolderConflict({
+        sourceId,
+        targetId,
+        originalName: nameConflict.originalName,
+        suggestedName: nameConflict.suggestedName
+      });
+      return true;
+    }
+    return false;
+  };
 
   const moveFolder = async (folderId: string, targetFolderId: string | null, skipConflictCheck: boolean = false) => {
-    console.log('moveFolder called:', { folderId, targetFolderId, skipConflictCheck });
-    if (!skipConflictCheck && checkFolderConflict(folderId, targetFolderId, folders)) {
-      console.log('Conflict detected in moveFolder');
-      const sourceFolder = folders.find(f => f.id === folderId);
-      if (sourceFolder) {
-        setFolderConflict({
-          sourceId: folderId,
-          targetId: targetFolderId,
-          originalName: sourceFolder.name,
-          suggestedName: getUniqueFolderName(folders, sourceFolder.name, targetFolderId)
-        });
-      }
-      return;
-    }
-
     const result = await operations.moveFolder(
       { sourceId: folderId, targetId: targetFolderId },
       folders
     );
+
+    if (!result.success && result.data && !skipConflictCheck) {
+      const conflict = result.data as FolderConflictResult;
+      if (handleConflict(conflict, folderId, targetFolderId)) {
+        return;
+      }
+    }
 
     if (result.success) {
       const updatedFolders = folders.map(folder => 
@@ -79,59 +74,74 @@ export function useFolderOperations({
   };
 
   const renameAndMoveFolder = async (id: string, newName: string, targetId: string | null): Promise<boolean> => {
-    console.log('renameAndMoveFolder called:', { id, newName, targetId });
-    // Check for name conflicts in target location
-    const hasDuplicate = folders.some(
-      f => f.id !== id && 
-          f.parentId === targetId && 
-          f.name.toLowerCase() === newName.toLowerCase()
-    );
-
-    if (hasDuplicate) {
-      console.log('Name conflict detected in renameAndMoveFolder');
-      const suggestedName = getUniqueFolderName(folders, newName, targetId);
-      console.log('Suggested name:', suggestedName);
-      setFolderConflict({
-        sourceId: id,
-        targetId: targetId,
-        originalName: newName,
-        suggestedName: suggestedName
-      });
-      return false;
+    const result = await operations.renameAndMoveFolder(id, newName, targetId, folders);
+    
+    if (result.success) {
+      const updatedFolders = folders.map(f => 
+        f.id === id
+          ? { 
+              ...f, 
+              name: newName,
+              parentId: targetId,
+              modifiedAt: new Date().toISOString() 
+            }
+          : f
+      );
+      setFolders(updatedFolders);
+      return true;
     }
 
-    console.log('No conflict, proceeding with rename and move');
-    return await coreRenameAndMoveFolder(id, newName, targetId);
+    return false;
+  };
+
+  const replaceFolder = async (sourceId: string, targetId: string | null): Promise<boolean> => {
+    const result = await operations.replaceFolder(
+      { sourceId, targetId },
+      folders
+    );
+
+    if (result.success) {
+      const sourceFolder = folders.find(f => f.id === sourceId);
+      if (!sourceFolder) return false;
+
+      // Find conflicting folders
+      const conflictingFolders = folders.filter(folder => 
+        folder.id !== sourceId &&
+        folder.parentId === targetId &&
+        folder.name.toLowerCase() === sourceFolder.name.toLowerCase()
+      );
+
+      // Get all folder IDs that need to be deleted
+      const folderIdsToDelete = new Set<string>();
+      conflictingFolders.forEach(folder => {
+        const ids = getAllSubFolders(folders, folder.id).map(f => f.id);
+        ids.forEach(id => folderIdsToDelete.add(id));
+        folderIdsToDelete.add(folder.id);
+      });
+
+      // Update folders state
+      const updatedFolders = folders
+        .filter(folder => !folderIdsToDelete.has(folder.id))
+        .map(folder => 
+          folder.id === sourceId
+            ? { ...folder, parentId: targetId, modifiedAt: new Date().toISOString() }
+            : folder
+        );
+
+      setFolders(updatedFolders);
+
+      // Update current folder if it was deleted
+      if (folderIdsToDelete.has(currentFolderId || '')) {
+        setCurrentFolderId(targetId);
+      }
+
+      return true;
+    }
+
+    return false;
   };
 
   const renameFolder = async (id: string, newName: string): Promise<boolean> => {
-    console.log('renameFolder called:', { id, newName });
-    const folder = folders.find(f => f.id === id);
-    if (!folder) {
-      console.log('Folder not found:', id);
-      return false;
-    }
-
-    // Check for name conflicts
-    const hasDuplicate = folders.some(
-      f => f.id !== id && 
-          f.parentId === folder.parentId && 
-          f.name.toLowerCase() === newName.toLowerCase()
-    );
-
-    if (hasDuplicate) {
-      console.log('Name conflict detected in renameFolder');
-      const suggestedName = getUniqueFolderName(folders, newName, folder.parentId);
-      console.log('Suggested name:', suggestedName);
-      setFolderConflict({
-        sourceId: id,
-        targetId: folder.parentId,
-        originalName: newName,
-        suggestedName: suggestedName
-      });
-      return false;
-    }
-
     const result = await operations.renameFolder(
       { id, newName },
       folders

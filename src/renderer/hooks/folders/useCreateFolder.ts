@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Folder } from './types';
+import { useState, useCallback } from 'react';
+import { Folder } from '../../../core/storage/folders/models';
 import { FolderOperations } from '../../../core/operations/folders';
-import { ElectronStorage } from '../../../services/storage/electron';
+import { ElectronFolderStorage } from '../../../services/storage';
 
 interface UseCreateFolderProps {
   folders: Folder[];
@@ -27,7 +27,16 @@ export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): 
   const [folderError, setFolderError] = useState<string | undefined>();
   const [createInFolderId, setCreateInFolderId] = useState<string | null>(null);
 
-  const operations = new FolderOperations(new ElectronStorage());
+  const operations = new FolderOperations(new ElectronFolderStorage());
+
+  const checkNameUniqueness = useCallback((nameToCheck: string): boolean => {
+    if (!folders.length) return true;
+    
+    return !folders.some(
+      folder => folder.parentId === createInFolderId && 
+                folder.name.toLowerCase() === nameToCheck.toLowerCase()
+    );
+  }, [folders, createInFolderId]);
 
   // UI Event Handlers
   const openCreateModal = (parentId?: string | null) => {
@@ -44,11 +53,28 @@ export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): 
     setCreateInFolderId(null);
   };
 
+  const setNewFolderNameWithValidation = (name: string) => {
+    setNewFolderName(name);
+    
+    if (!name.trim()) {
+      setFolderError('Folder name is required');
+    } else if (!checkNameUniqueness(name.trim())) {
+      setFolderError('A folder with this name already exists');
+    } else {
+      setFolderError(undefined);
+    }
+  };
+
   const handleCreateFolder = async () => {
     const trimmedName = newFolderName.trim();
     
     if (!trimmedName) {
       setFolderError('Folder name is required');
+      return;
+    }
+
+    if (!checkNameUniqueness(trimmedName)) {
+      setFolderError('A folder with this name already exists');
       return;
     }
 
@@ -72,8 +98,11 @@ export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): 
   };
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleCreateFolder();
-    else if (e.key === 'Escape') closeCreateModal();
+    if (e.key === 'Enter' && !folderError && newFolderName.trim()) {
+      handleCreateFolder();
+    } else if (e.key === 'Escape') {
+      closeCreateModal();
+    }
   };
 
   return {
@@ -83,7 +112,7 @@ export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): 
     createInFolderId,
     openCreateModal,
     closeCreateModal,
-    setNewFolderName,
+    setNewFolderName: setNewFolderNameWithValidation,
     handleCreateFolder,
     handleInputKeyDown
   };

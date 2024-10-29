@@ -1,24 +1,9 @@
-export interface Folder {
-  id: string;
-  name: string;
-  parentId: string | null;
-  createdAt: string;
-  modifiedAt: string;
-}
+import { Folder } from '../../../core/storage/folders/models';
+import { FolderConflict } from '../../../core/operations/folders/conflicts';
 
-export interface FolderConflict {
-  sourceId: string;
-  targetId: string | null;
-  originalName: string;  // Original name that caused the conflict
-  suggestedName: string;  // Suggested unique name for resolution
-}
-
-export interface FolderData {
-  folders: Folder[];
-  version: number;
-  lastBackup: string;
-}
-
+/**
+ * UI state for folder management
+ */
 export interface FolderState {
   folders: Folder[];
   currentFolderId: string | null;
@@ -30,6 +15,9 @@ export interface FolderState {
   folderConflict: FolderConflict | null;
 }
 
+/**
+ * Helper type for rename and move operations
+ */
 export interface MoveAfterRename {
   targetId: string | null;
 }

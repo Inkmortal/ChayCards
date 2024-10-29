@@ -1,15 +1,17 @@
 import { Folder } from '../../../core/storage/folders/models';
-import { RenameFolderData, OperationResult } from '../types';
+import { OperationResult } from '../types';
 import { StorageInterface } from '../../storage/types';
 import { validateFolderName } from './validation';
 
-export async function renameFolder(
-  data: RenameFolderData,
+export async function renameAndMoveFolder(
+  id: string,
+  newName: string,
+  targetId: string | null,
   folders: Folder[],
   storage: StorageInterface
 ): Promise<OperationResult> {
   try {
-    const folder = folders.find(f => f.id === data.id);
+    const folder = folders.find(f => f.id === id);
     if (!folder) {
       return {
         success: false,
@@ -17,7 +19,7 @@ export async function renameFolder(
       };
     }
 
-    const isValid = await validateFolderName(data.newName, folder.parentId, folders);
+    const isValid = await validateFolderName(newName, targetId, folders);
     if (!isValid) {
       return {
         success: false,
@@ -25,10 +27,15 @@ export async function renameFolder(
       };
     }
 
-    // Update folder name and save
+    // Update folder name and location
     const updatedFolders = folders.map(f => 
-      f.id === data.id
-        ? { ...f, name: data.newName, modifiedAt: new Date().toISOString() }
+      f.id === id
+        ? { 
+            ...f, 
+            name: newName,
+            parentId: targetId,
+            modifiedAt: new Date().toISOString() 
+          }
         : f
     );
     
@@ -40,7 +47,7 @@ export async function renameFolder(
   } catch (error) {
     return {
       success: false,
-      error: 'Failed to rename folder'
+      error: 'Failed to rename and move folder'
     };
   }
 }

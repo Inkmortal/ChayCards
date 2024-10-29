@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Folder } from './types';
-import { loadFoldersFromApi, restoreFoldersFromBackup, subscribeToFolderUpdates } from './api';
+import { Folder } from '../../../core/storage/folders/models';
 import { useCreateFolder } from './useCreateFolder';
 import { useFolderOperations } from './useFolderOperations';
 import { useNavigation } from './useNavigation';
+import { ElectronFolderStorage } from '../../../services/storage';
+
+const storage = new ElectronFolderStorage();
 
 export function useFolders() {
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -14,7 +16,7 @@ export function useFolders() {
   const loadFolders = async () => {
     try {
       setIsLoading(true);
-      const loadedFolders = await loadFoldersFromApi();
+      const loadedFolders = await storage.loadFolders();
       setFolders(loadedFolders);
     } catch (error) {
       console.error('Error loading folders:', error);
@@ -32,14 +34,14 @@ export function useFolders() {
   // Set up folder update subscription after initial load
   useEffect(() => {
     if (!isInitialLoad) {
-      const unsubscribe = subscribeToFolderUpdates(() => loadFolders());
+      const unsubscribe = storage.subscribeToUpdates(() => loadFolders());
       return () => unsubscribe();
     }
   }, [isInitialLoad]);
 
   const restoreFromBackup = async () => {
     try {
-      const restoredFolders = await restoreFoldersFromBackup();
+      const restoredFolders = await storage.restoreFolders();
       setFolders(restoredFolders);
     } catch (error) {
       console.error('Error restoring folders:', error);

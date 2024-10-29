@@ -147,7 +147,7 @@ export function FolderContext({
                 e.stopPropagation();
                 setShowRenameModal(true);
               }}
-              className="flex items-center justify-center w-5 h-5 rounded hover:bg-surface/80"
+              className="flex items-center justify-center w-5 h-5 rounded text-text-light hover:text-secondary transition-colors"
             >
               <Icon name="pencil" className="w-3.5 h-3.5" />
             </button>

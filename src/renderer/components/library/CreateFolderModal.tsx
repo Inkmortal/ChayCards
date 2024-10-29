@@ -40,7 +40,11 @@ export function CreateFolderModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={onSubmit}>
+          <Button 
+            variant="primary" 
+            onClick={onSubmit}
+            disabled={!!error || !folderName.trim()}
+          >
             Create
           </Button>
         </div>

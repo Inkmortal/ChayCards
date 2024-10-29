@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Input } from '../ui';
+import { Modal, Input, Button } from '../ui';
+import { Folder } from '../../../core/storage/folders/models';
+import { detectNameConflict } from '../../../core/operations/folders/conflicts';
 
 interface RenameModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRename: (newName: string) => void;
   currentName: string;
-  folders?: { id: string; name: string; parentId: string | null; }[];
+  folders?: Folder[];
   parentId?: string | null;
   itemId?: string;
 }
@@ -28,34 +30,32 @@ export function RenameModal({
     setError(undefined);
   }, [currentName, isOpen]);
 
-  const checkNameUniqueness = (nameToCheck: string): boolean => {
-    if (!folders.length) return true;
-    
-    return !folders.some(
-      folder => folder.id !== itemId && 
-                folder.parentId === parentId && 
-                folder.name.toLowerCase() === nameToCheck.toLowerCase()
-    );
+  const validateName = (nameToCheck: string) => {
+    const trimmedName = nameToCheck.trim();
+    if (!trimmedName) {
+      return 'Folder name is required';
+    }
+
+    const conflict = detectNameConflict(trimmedName, parentId, folders, itemId);
+    if (conflict) {
+      return conflict.message;
+    }
+
+    return undefined;
   };
 
-  const handleNameChange = (newName: string) => {
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
     setName(newName);
-    if (!checkNameUniqueness(newName)) {
-      setError('A folder with this name already exists');
-    } else {
-      setError(undefined);
-    }
+    setError(validateName(newName));
   };
 
   const handleSubmit = () => {
     const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError('Name cannot be empty');
-      return;
-    }
-
-    if (!checkNameUniqueness(trimmedName)) {
-      setError('A folder with this name already exists');
+    const validationError = validateName(trimmedName);
+    
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -71,33 +71,33 @@ export function RenameModal({
       <div className="space-y-4">
         <Input
           value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
+          onChange={handleNameChange}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !error) handleSubmit();
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Enter' && !error && name.trim()) {
+              handleSubmit();
+            }
+            if (e.key === 'Escape') {
+              onClose();
+            }
           }}
           placeholder="Enter folder name"
           autoFocus
           error={error}
         />
         <div className="flex justify-end gap-3">
-          <button
+          <Button 
+            variant="secondary" 
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-text-light hover:text-text-dark bg-surface hover:bg-surface-hover rounded-lg transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button 
+            variant="primary" 
             onClick={handleSubmit}
-            disabled={!!error}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
-              error 
-                ? 'bg-primary/50 cursor-not-allowed' 
-                : 'bg-primary hover:bg-primary/90'
-            }`}
+            disabled={!!error || !name.trim()}
           >
             Rename
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

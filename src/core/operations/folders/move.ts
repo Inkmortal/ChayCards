@@ -1,7 +1,7 @@
-import { Folder } from '../../../renderer/hooks/folders/types';
+import { Folder } from '../../../core/storage/folders/models';
 import { MoveFolderData, OperationResult } from '../types';
 import { StorageInterface } from '../../storage/types';
-import { wouldCreateCircularReference } from './validation';
+import { detectMoveConflict } from './conflicts';
 
 export async function moveFolder(
   data: MoveFolderData,
@@ -17,11 +17,13 @@ export async function moveFolder(
       };
     }
 
-    // Check for circular reference
-    if (wouldCreateCircularReference(data.sourceId, data.targetId, folders)) {
+    // Check for conflicts
+    const conflict = detectMoveConflict(data.sourceId, data.targetId, folders);
+    if (conflict) {
       return {
         success: false,
-        error: 'Cannot move folder into its own subfolder'
+        error: conflict.message || 'Conflict detected',
+        data: conflict
       };
     }
 

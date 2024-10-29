@@ -12,11 +12,16 @@ export function TreeNode({
   onSelect, 
   onCreateFolder, 
   onRename, 
-  onMove 
+  onMove,
+  folderConflict,
+  onConflictResolve,
+  itemToRename,
+  setItemToRename,
+  pendingMove,
+  setPendingMove
 }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [showRenameModal, setShowRenameModal] = useState(false);
   const { showContextMenu } = useContextMenu();
   const children = items.filter(i => i.parentId === item.id);
   const hasChildren = children.length > 0;
@@ -61,9 +66,27 @@ export function TreeNode({
         {
           label: 'Rename',
           icon: '✏️',
-          onClick: () => setShowRenameModal(true)
+          onClick: () => setItemToRename({
+            id: item.id,
+            name: item.name,
+            type: 'folder',
+            modifiedAt: item.modifiedAt,
+            createdAt: item.createdAt
+          })
         }
       ], { x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleRename = (newName: string) => {
+    if (onRename) {
+      if (pendingMove) {
+        onRename(item.id, newName, { targetId: pendingMove.targetId });
+        setPendingMove(null);
+      } else {
+        onRename(item.id, newName);
+      }
+      setItemToRename(null);
     }
   };
 
@@ -140,20 +163,15 @@ export function TreeNode({
               onCreateFolder={onCreateFolder}
               onRename={onRename}
               onMove={onMove}
+              folderConflict={folderConflict}
+              onConflictResolve={onConflictResolve}
+              itemToRename={itemToRename}
+              setItemToRename={setItemToRename}
+              pendingMove={pendingMove}
+              setPendingMove={setPendingMove}
             />
           ))}
         </div>
-      )}
-      {showRenameModal && onRename && (
-        <RenameModal
-          isOpen={showRenameModal}
-          onClose={() => setShowRenameModal(false)}
-          onRename={(newName) => {
-            onRename(item.id, newName);
-            setShowRenameModal(false);
-          }}
-          currentName={item.name}
-        />
       )}
     </>
   );

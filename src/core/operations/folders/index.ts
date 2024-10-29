@@ -1,5 +1,5 @@
 import { StorageInterface } from '../../storage/types';
-import { Folder } from '../../../renderer/hooks/folders/types';
+import { Folder } from '../../../core/storage/folders/models';
 import { 
   OperationResult,
   CreateFolderData,
@@ -11,6 +11,8 @@ import { createFolder } from './create';
 import { moveFolder } from './move';
 import { renameFolder } from './rename';
 import { deleteFolder } from './delete';
+import { renameAndMoveFolder } from './renameAndMove';
+import { replaceFolder, ReplaceFolderData } from './replace';
 
 export class FolderOperations implements FolderOperationsType {
   private storage: StorageInterface;
@@ -46,4 +48,27 @@ export class FolderOperations implements FolderOperationsType {
   ): Promise<OperationResult> {
     return await deleteFolder(id, folders, this.storage);
   }
+
+  async renameAndMoveFolder(
+    id: string,
+    newName: string,
+    targetId: string | null,
+    folders: Folder[]
+  ): Promise<OperationResult> {
+    return await renameAndMoveFolder(id, newName, targetId, folders, this.storage);
+  }
+
+  async replaceFolder(
+    data: ReplaceFolderData,
+    folders: Folder[]
+  ): Promise<OperationResult> {
+    return await replaceFolder(data, folders, this.storage);
+  }
 }
+
+export type {
+  CreateFolderData,
+  MoveFolderData,
+  RenameFolderData,
+  ReplaceFolderData
+};

@@ -1,6 +1,7 @@
-import { Folder } from '../../../renderer/hooks/folders/types';
+import { Folder } from '../../../core/storage/folders/models';
 import { OperationResult } from '../types';
 import { StorageInterface } from '../../storage/types';
+import { getFoldersToDelete } from './conflicts';
 
 export async function deleteFolder(
   id: string,
@@ -16,8 +17,12 @@ export async function deleteFolder(
       };
     }
 
-    // Remove folder and save
-    const updatedFolders = folders.filter(f => f.id !== id);
+    // Get all folders that need to be deleted (including descendants)
+    const folderIdsToDelete = getFoldersToDelete(folders, id);
+    console.log('Deleting folders:', Array.from(folderIdsToDelete));
+
+    // Remove folder and all its descendants
+    const updatedFolders = folders.filter(f => !folderIdsToDelete.has(f.id));
     await storage.saveFolders(updatedFolders);
 
     return {
