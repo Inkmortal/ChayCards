@@ -5,6 +5,8 @@ import { ViewToggle } from '../ui/ViewToggle';
 import { Folder } from '../../../core/storage/folders/models';
 import { FolderConflict } from '../../../core/operations/folders/conflicts';
 import { Item } from './types';
+import { FolderConflictModal } from './FolderConflictModal';
+import { RenameModal } from './RenameModal';
 
 interface FolderGridProps {
   folders: Folder[];
@@ -14,17 +16,26 @@ interface FolderGridProps {
   onNavigateFolder: (id: string) => void;
   onDeleteFolder: (id: string) => void;
   onRenameFolder: (id: string, newName: string, moveAfter?: { targetId: string | null }) => void;
-  onMoveFolder: (sourceId: string, targetId: string | null) => void;
-  folderConflict?: FolderConflict | null;
-  onConflictResolve?: {
-    replace: () => void;
-    rename: () => void;
-    cancel: () => void;
-  };
+  onMoveFolder: (sourceId: string, targetId: string | null) => Promise<{
+    success: boolean;
+    error?: string;
+    conflict?: FolderConflict;
+  }>;
+  onReplaceFolder: (sourceId: string, targetId: string | null) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  // Rename state
   itemToRename: Item | null;
   setItemToRename: (item: Item | null) => void;
   pendingMove: { sourceId: string; targetId: string | null } | null;
   setPendingMove: (move: { sourceId: string; targetId: string | null } | null) => void;
+  folderConflict: FolderConflict | null;
+  onConflictResolve: {
+    replace: () => void;
+    rename: () => void;
+    cancel: () => void;
+  };
 }
 
 export function FolderGrid({
@@ -36,14 +47,55 @@ export function FolderGrid({
   onDeleteFolder,
   onRenameFolder,
   onMoveFolder,
-  folderConflict,
-  onConflictResolve,
+  onReplaceFolder,
+  // Rename state
   itemToRename,
   setItemToRename,
   pendingMove,
-  setPendingMove
+  setPendingMove,
+  folderConflict,
+  onConflictResolve
 }: FolderGridProps) {
   const [view, setView] = React.useState<'card' | 'simple'>('card');
+
+  // Handle move with conflict detection
+  const handleMove = async (sourceId: string, targetId: string | null) => {
+    const result = await onMoveFolder(sourceId, targetId);
+    return result;
+  };
+
+  // Handle rename with move support
+  const handleRename = (id: string, newName: string) => {
+    if (pendingMove) {
+      onRenameFolder(id, newName, { targetId: pendingMove.targetId });
+      setPendingMove(null);
+    } else {
+      onRenameFolder(id, newName);
+    }
+    setItemToRename(null);
+  };
+
+  // Common props for views
+  const viewProps = {
+    items: folders.map(folder => ({
+      id: folder.id,
+      name: folder.name,
+      type: 'folder' as const,
+      modifiedAt: folder.modifiedAt,
+      createdAt: folder.createdAt
+    })),
+    onSelect: onNavigateFolder,
+    onDelete: onDeleteFolder,
+    onCreateFolder,
+    onMove: handleMove,
+    onRename: handleRename,
+    folders: allFolders,
+    currentFolderId: currentFolder?.id || null,
+    itemToRename,
+    setItemToRename,
+    pendingMove,
+    setPendingMove
+  };
 
   const ViewComponent = view === 'card' ? CardView : SimpleView;
 
@@ -56,27 +108,24 @@ export function FolderGrid({
         />
       </div>
 
-      <ViewComponent
-        items={folders.map(folder => ({
-          id: folder.id,
-          name: folder.name,
-          type: 'folder' as const,
-          modifiedAt: folder.modifiedAt,
-          createdAt: folder.createdAt
-        }))}
-        onSelect={onNavigateFolder}
-        onDelete={onDeleteFolder}
-        onCreateFolder={onCreateFolder}
-        onRename={onRenameFolder}
-        onMove={onMoveFolder}
+      <ViewComponent {...viewProps} />
+
+      <FolderConflictModal
+        isOpen={folderConflict !== null}
+        onClose={onConflictResolve.cancel}
+        onReplace={onConflictResolve.replace}
+        onRename={onConflictResolve.rename}
+        folderName={folderConflict?.originalName || ''}
+      />
+
+      <RenameModal
+        isOpen={itemToRename !== null}
+        onClose={() => setItemToRename(null)}
+        onRename={(newName) => itemToRename && handleRename(itemToRename.id, newName)}
+        currentName={itemToRename?.name || ''}
         folders={allFolders}
-        currentFolderId={currentFolder?.id || null}
-        folderConflict={folderConflict}
-        onConflictResolve={onConflictResolve}
-        itemToRename={itemToRename}
-        setItemToRename={setItemToRename}
-        pendingMove={pendingMove}
-        setPendingMove={setPendingMove}
+        parentId={pendingMove ? pendingMove.targetId : currentFolder?.id || null}
+        itemId={itemToRename?.id}
       />
     </div>
   );

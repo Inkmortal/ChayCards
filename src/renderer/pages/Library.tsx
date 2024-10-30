@@ -5,98 +5,106 @@ import {
   FolderGrid, 
   CreateFolderModal,
   Sidebar,
-  DocumentsSection,
-  RenameModal
+  DocumentsSection
 } from '../components/library';
-import { useFolders } from '../hooks/useFolders';
+import { useFolders } from '../hooks/folders/useFolders';
 import { Item } from '../components/library/types';
+import { FolderConflict } from '../../core/operations/folders/conflicts';
+import { Folder } from '../../core/storage/folders/models';
 
 export function Library() {
   const {
+    // Core state
     folders,
     currentFolder,
     currentFolders,
-    breadcrumbPath,
+    isLoading,
+
+    // UI state
     isCreateModalOpen,
     newFolderName,
     folderError,
-    folderConflict,
-    setFolderConflict,
+
+    // Create folder
     openCreateModal,
     closeCreateModal,
+    setNewFolderName,
     handleCreateFolder,
-    deleteFolder,
-    renameFolder,
-    renameAndMoveFolder,
-    replaceFolder,
+
+    // Operations
     moveFolder,
+    replaceFolder,
+    renameFolder,
+    deleteFolder,
+
+    // Navigation
     navigateFolder,
     navigateBack,
-    navigateToFolder,
-    setNewFolderName,
-    handleInputKeyDown
+    navigateToFolder
   } = useFolders();
 
+  // Shared rename state
   const [itemToRename, setItemToRename] = useState<Item | null>(null);
   const [pendingMove, setPendingMove] = useState<{
     sourceId: string;
     targetId: string | null;
   } | null>(null);
-  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+  const [folderConflict, setFolderConflict] = useState<FolderConflict | null>(null);
 
-  const handleRename = async (id: string, newName: string) => {
-    const success = await renameFolder(id, newName);
-    return success;
-  };
-
-  const handleMove = async (sourceId: string, targetId: string | null, skipConflictCheck?: boolean) => {
-    if (isResolvingConflict) {
-      return;
-    }
-    await moveFolder(sourceId, targetId, skipConflictCheck);
-  };
-
-  const handleResolveConflict = async (action: 'rename' | 'replace') => {
-    if (!folderConflict) {
-      return;
-    }
-
-    setIsResolvingConflict(true);
-    try {
-      if (action === 'replace') {
-        const success = await replaceFolder(folderConflict.sourceId, folderConflict.targetId);
-        if (success) {
-          setFolderConflict(null);
-        }
-      } else {
-        const sourceFolder = folders.find(f => f.id === folderConflict.sourceId);
-        if (sourceFolder) {
-          setPendingMove({
-            sourceId: folderConflict.sourceId,
-            targetId: folderConflict.targetId
-          });
-          setItemToRename({
-            id: sourceFolder.id,
-            name: folderConflict.suggestedName,
-            type: 'folder',
-            modifiedAt: sourceFolder.modifiedAt,
-            createdAt: sourceFolder.createdAt
-          });
-        }
+  // Conflict resolution handlers
+  const handleConflictResolve = {
+    replace: async () => {
+      if (!folderConflict) return;
+      const result = await replaceFolder(folderConflict.sourceId, folderConflict.targetId);
+      if (result.success) {
         setFolderConflict(null);
       }
-    } finally {
-      setIsResolvingConflict(false);
+    },
+    rename: () => {
+      if (!folderConflict) return;
+      setPendingMove({
+        sourceId: folderConflict.sourceId,
+        targetId: folderConflict.targetId
+      });
+      const sourceItem = folders.find(f => f.id === folderConflict.sourceId);
+      if (sourceItem) {
+        setItemToRename({
+          id: sourceItem.id,
+          name: folderConflict.suggestedName,
+          type: 'folder',
+          modifiedAt: sourceItem.modifiedAt,
+          createdAt: sourceItem.createdAt
+        });
+      }
+      setFolderConflict(null);
+    },
+    cancel: () => {
+      setFolderConflict(null);
+      setPendingMove(null);
+      setItemToRename(null);
     }
   };
 
-  const conflictHandlers = {
-    replace: () => handleResolveConflict('replace'),
-    rename: () => handleResolveConflict('rename'),
-    cancel: () => {
-      setFolderConflict(null);
-      setIsResolvingConflict(false);
+  // Move handler that manages conflicts
+  const handleMove = async (sourceId: string, targetId: string | null) => {
+    const result = await moveFolder(sourceId, targetId);
+    if (!result.success && result.conflict) {
+      setFolderConflict(result.conflict);
     }
+    return result;
+  };
+
+  // Build breadcrumb path
+  const getBreadcrumbPath = (folder: Folder): Folder[] => {
+    const path: Folder[] = [];
+    let current: Folder | undefined = folder;
+    
+    while (current) {
+      path.unshift(current);
+      current = folders.find(f => f.id === current?.parentId);
+    }
+
+    return path;
   };
 
   return (
@@ -107,9 +115,9 @@ export function Library() {
         onSelect={navigateToFolder}
         onCreateFolder={openCreateModal}
         onMoveFolder={handleMove}
-        onRenameFolder={handleRename}
+        onRenameFolder={renameFolder}
         folderConflict={folderConflict}
-        onConflictResolve={conflictHandlers}
+        onConflictResolve={handleConflictResolve}
         itemToRename={itemToRename}
         setItemToRename={setItemToRename}
         pendingMove={pendingMove}
@@ -123,11 +131,13 @@ export function Library() {
           {currentFolder && (
             <FolderContext
               currentFolder={currentFolder}
-              breadcrumbPath={breadcrumbPath}
+              breadcrumbPath={getBreadcrumbPath(currentFolder)}
               onNavigateBack={navigateBack}
               onNavigateToFolder={navigateToFolder}
               onMoveFolder={handleMove}
-              onRenameFolder={handleRename}
+              onRenameFolder={renameFolder}
+              itemToRename={itemToRename}
+              setItemToRename={setItemToRename}
             />
           )}
 
@@ -139,14 +149,21 @@ export function Library() {
               onCreateFolder={() => openCreateModal(currentFolder?.id || null)}
               onNavigateFolder={navigateFolder}
               onDeleteFolder={deleteFolder}
-              onRenameFolder={handleRename}
+              onRenameFolder={renameFolder}
               onMoveFolder={handleMove}
-              folderConflict={folderConflict}
-              onConflictResolve={conflictHandlers}
+              onReplaceFolder={async (sourceId, targetId) => {
+                const result = await replaceFolder(sourceId, targetId);
+                if (result.success) {
+                  setFolderConflict(null);
+                }
+                return result;
+              }}
               itemToRename={itemToRename}
               setItemToRename={setItemToRename}
               pendingMove={pendingMove}
               setPendingMove={setPendingMove}
+              folderConflict={folderConflict}
+              onConflictResolve={handleConflictResolve}
             />
 
             <DocumentsSection />
@@ -159,41 +176,16 @@ export function Library() {
         onClose={closeCreateModal}
         folderName={newFolderName}
         onFolderNameChange={(e) => setNewFolderName(e.target.value)}
-        onKeyDown={handleInputKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !folderError && newFolderName.trim()) {
+            handleCreateFolder();
+          } else if (e.key === 'Escape') {
+            closeCreateModal();
+          }
+        }}
         error={folderError}
         onSubmit={handleCreateFolder}
       />
-
-      {itemToRename && (
-        <RenameModal
-          isOpen={true}
-          onClose={() => {
-            setItemToRename(null);
-            setFolderConflict(null);
-            setIsResolvingConflict(false);
-          }}
-          onRename={async (newName: string) => {
-            let success = false;
-            if (pendingMove) {
-              success = await renameAndMoveFolder(
-                itemToRename.id,
-                newName,
-                pendingMove.targetId
-              );
-            } else {
-              success = await handleRename(itemToRename.id, newName);
-            }
-            if (success) {
-              setItemToRename(null);
-              setPendingMove(null);
-            }
-          }}
-          currentName={itemToRename.name}
-          folders={folders}
-          parentId={pendingMove ? pendingMove.targetId : currentFolder?.id || null}
-          itemId={itemToRename.id}
-        />
-      )}
     </div>
   );
 }

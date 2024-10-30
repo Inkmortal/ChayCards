@@ -1,128 +1,143 @@
-import { useState, useEffect } from 'react';
-import { Folder } from '../../../core/storage/folders/models';
-import { useCreateFolder } from './useCreateFolder';
-import { useFolderOperations } from './useFolderOperations';
-import { useNavigation } from './useNavigation';
-import { ElectronFolderStorage } from '../../../services/storage';
-
-const storage = new ElectronFolderStorage();
+import { useFolderState } from './useFolderState';
+import { CreateFolderData } from '../../../core/operations/types';
+import { Item } from '../../components/library/types';
 
 export function useFolders() {
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  const loadFolders = async () => {
-    try {
-      setIsLoading(true);
-      const loadedFolders = await storage.loadFolders();
-      setFolders(loadedFolders);
-    } catch (error) {
-      console.error('Error loading folders:', error);
-    } finally {
-      setIsLoading(false);
-      setIsInitialLoad(false);
-    }
-  };
-
-  // Load folders on mount
-  useEffect(() => {
-    loadFolders();
-  }, []);
-
-  // Set up folder update subscription after initial load
-  useEffect(() => {
-    if (!isInitialLoad) {
-      const unsubscribe = storage.subscribeToUpdates(() => loadFolders());
-      return () => unsubscribe();
-    }
-  }, [isInitialLoad]);
-
-  const restoreFromBackup = async () => {
-    try {
-      const restoredFolders = await storage.restoreFolders();
-      setFolders(restoredFolders);
-    } catch (error) {
-      console.error('Error restoring folders:', error);
-    }
-  };
-
   const {
+    // Core state
+    folders,
+    currentFolder,
+    currentFolders,
+    isLoading,
+
+    // UI state
+    itemToRename,
+    pendingMove,
+    folderConflict,
     isCreateModalOpen,
     newFolderName,
     folderError,
     createInFolderId,
+
+    // UI actions
     openCreateModal,
     closeCreateModal,
     setNewFolderName,
-    handleCreateFolder,
-    handleInputKeyDown
-  } = useCreateFolder({ folders, setFolders });
-
-  const {
-    folderConflict,
+    setItemToRename,
+    setPendingMove,
     setFolderConflict,
-    moveFolder,
-    renameFolder,
-    renameAndMoveFolder,
-    replaceFolder,
-    deleteFolder,
-    getAllSubFolders
-  } = useFolderOperations({
-    folders,
-    setFolders,
-    currentFolderId,
-    setCurrentFolderId
-  });
+    clearModalStates,
 
-  const {
-    currentFolder,
-    currentFolders,
-    breadcrumbPath,
-    navigateFolder,
-    navigateBack,
-    navigateToFolder
-  } = useNavigation({
-    folders,
-    currentFolderId,
-    setCurrentFolderId
-  });
+    // Core operations
+    createFolder,
+    moveFolder,
+    replaceFolder,
+    renameFolder,
+    deleteFolder,
+
+    // Navigation
+    setCurrentFolder
+  } = useFolderState();
+
+  // Create folder
+  const handleCreateFolder = async () => {
+    const trimmedName = newFolderName.trim();
+    
+    if (folderError || !trimmedName) {
+      return;
+    }
+
+    const data: CreateFolderData = {
+      name: trimmedName,
+      // Use createInFolderId if set (from tree view), otherwise use current folder
+      parentId: createInFolderId ?? currentFolder?.id ?? null
+    };
+
+    const result = await createFolder(data);
+    if (result.success) {
+      closeCreateModal();
+    }
+  };
+
+  // Move operations
+  const handleMove = async (sourceId: string, targetId: string | null) => {
+    const result = await moveFolder(sourceId, targetId);
+    if (!result.success && result.conflict) {
+      setFolderConflict(result.conflict);
+    }
+    return result;
+  };
+
+  // Conflict resolution
+  const handleConflictResolve = {
+    replace: async () => {
+      if (!folderConflict) return;
+      const result = await replaceFolder(
+        folderConflict.sourceId,
+        folderConflict.targetId
+      );
+      if (result.success) {
+        setFolderConflict(null);
+      }
+    },
+    rename: () => {
+      if (!folderConflict) return;
+      setPendingMove({
+        sourceId: folderConflict.sourceId,
+        targetId: folderConflict.targetId
+      });
+      // Create Item from folder for rename
+      const sourceItem: Item = {
+        id: folderConflict.sourceId,
+        name: folderConflict.suggestedName,
+        type: 'folder',
+        modifiedAt: folders.find(f => f.id === folderConflict.sourceId)?.modifiedAt || new Date().toISOString(),
+        createdAt: folders.find(f => f.id === folderConflict.sourceId)?.createdAt || new Date().toISOString()
+      };
+      setItemToRename(sourceItem);
+      setFolderConflict(null);
+    },
+    cancel: () => {
+      clearModalStates();
+    }
+  };
+
+  // Navigation
+  const navigateFolder = (id: string) => setCurrentFolder(id);
+  const navigateBack = () => currentFolder?.parentId !== undefined && setCurrentFolder(currentFolder.parentId);
+  const navigateToFolder = (id: string | null) => setCurrentFolder(id);
 
   return {
-    // State
+    // Core state
     folders,
     currentFolder,
     currentFolders,
-    breadcrumbPath,
+    isLoading,
+
+    // UI state
     isCreateModalOpen,
     newFolderName,
     folderError,
-    isLoading,
+    itemToRename,
+    pendingMove,
     folderConflict,
 
     // Create folder
     openCreateModal,
     closeCreateModal,
-    handleCreateFolder,
     setNewFolderName,
-    handleInputKeyDown,
+    handleCreateFolder,
 
-    // Folder operations
-    setFolderConflict,
-    moveFolder,
-    renameFolder,
-    renameAndMoveFolder,
+    // Operations
+    moveFolder: handleMove,
     replaceFolder,
+    renameFolder,
     deleteFolder,
-    getAllSubFolders,
+    onConflictResolve: handleConflictResolve,
 
     // Navigation
     navigateFolder,
     navigateBack,
-    navigateToFolder,
-
-    // Backup
-    restoreFromBackup
+    navigateToFolder
   };
 }

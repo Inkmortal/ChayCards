@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Folder } from '../../../core/storage/folders/models';
 import { FolderOperations } from '../../../core/operations/folders';
 import { ElectronFolderStorage } from '../../../services/storage';
+import { detectNameConflict } from '../../../core/operations/folders/conflicts';
 
 interface UseCreateFolderProps {
   folders: Folder[];
@@ -21,7 +22,6 @@ interface UseCreateFolderReturn {
 }
 
 export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): UseCreateFolderReturn {
-  // UI State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderError, setFolderError] = useState<string | undefined>();
@@ -29,16 +29,11 @@ export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): 
 
   const operations = new FolderOperations(new ElectronFolderStorage());
 
-  const checkNameUniqueness = useCallback((nameToCheck: string): boolean => {
-    if (!folders.length) return true;
-    
-    return !folders.some(
-      folder => folder.parentId === createInFolderId && 
-                folder.name.toLowerCase() === nameToCheck.toLowerCase()
-    );
+  const validateName = useCallback((nameToCheck: string): string | undefined => {
+    const conflict = detectNameConflict(nameToCheck, createInFolderId, folders);
+    return conflict?.message;
   }, [folders, createInFolderId]);
 
-  // UI Event Handlers
   const openCreateModal = (parentId?: string | null) => {
     setIsCreateModalOpen(true);
     setNewFolderName('');
@@ -55,26 +50,15 @@ export function useCreateFolder({ folders, setFolders }: UseCreateFolderProps): 
 
   const setNewFolderNameWithValidation = (name: string) => {
     setNewFolderName(name);
-    
-    if (!name.trim()) {
-      setFolderError('Folder name is required');
-    } else if (!checkNameUniqueness(name.trim())) {
-      setFolderError('A folder with this name already exists');
-    } else {
-      setFolderError(undefined);
-    }
+    setFolderError(validateName(name));
   };
 
   const handleCreateFolder = async () => {
     const trimmedName = newFolderName.trim();
+    const error = validateName(trimmedName);
     
-    if (!trimmedName) {
-      setFolderError('Folder name is required');
-      return;
-    }
-
-    if (!checkNameUniqueness(trimmedName)) {
-      setFolderError('A folder with this name already exists');
+    if (error) {
+      setFolderError(error);
       return;
     }
 

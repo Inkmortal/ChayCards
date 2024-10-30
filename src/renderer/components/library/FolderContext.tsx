@@ -1,20 +1,22 @@
 import React, { DragEvent, useState, useEffect } from 'react';
 import { Icon } from '../ui';
-import { RenameModal } from './RenameModal';
-
-interface Folder {
-  id: string;
-  name: string;
-  parentId: string | null;
-}
+import { Item } from './types';
+import { Folder } from '../../../core/storage/folders/models';
 
 interface FolderContextProps {
   currentFolder: Folder;
   breadcrumbPath: Folder[];
   onNavigateBack: () => void;
   onNavigateToFolder: (id: string | null) => void;
-  onMoveFolder?: (sourceId: string, targetId: string | null) => void;
-  onRenameFolder?: (id: string, newName: string) => Promise<boolean>;
+  onMoveFolder?: (sourceId: string, targetId: string | null) => Promise<{
+    success: boolean;
+    error?: string;
+    conflict?: any;
+  }>;
+  onRenameFolder?: (id: string, newName: string) => void;
+  // Rename state
+  itemToRename: Item | null;
+  setItemToRename: (item: Item | null) => void;
 }
 
 export function FolderContext({ 
@@ -23,13 +25,14 @@ export function FolderContext({
   onNavigateBack,
   onNavigateToFolder,
   onMoveFolder,
-  onRenameFolder
+  onRenameFolder,
+  itemToRename,
+  setItemToRename
 }: FolderContextProps) {
   const [showFullPath, setShowFullPath] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [breadcrumbDragOverId, setBreadcrumbDragOverId] = useState<string | null>(null);
   const [isDraggingOverBreadcrumb, setIsDraggingOverBreadcrumb] = useState(false);
-  const [showRenameModal, setShowRenameModal] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
 
   useEffect(() => {
@@ -66,22 +69,25 @@ export function FolderContext({
     setBreadcrumbDragOverId(null);
   };
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>, targetId: string | null) => {
+  const handleDrop = async (e: DragEvent<HTMLDivElement>, targetId: string | null) => {
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain');
     if (onMoveFolder && sourceId && sourceId !== targetId) {
-      onMoveFolder(sourceId, targetId);
+      await onMoveFolder(sourceId, targetId);
     }
     setBreadcrumbDragOverId(null);
     setIsDraggingOverBreadcrumb(false);
   };
 
-  const handleRename = async (newName: string) => {
+  const handleStartRename = () => {
     if (onRenameFolder) {
-      const success = await onRenameFolder(currentFolder.id, newName);
-      if (success) {
-        setShowRenameModal(false);
-      }
+      setItemToRename({
+        id: currentFolder.id,
+        name: currentFolder.name,
+        type: 'folder',
+        modifiedAt: currentFolder.modifiedAt,
+        createdAt: currentFolder.createdAt
+      });
     }
   };
 
@@ -145,7 +151,7 @@ export function FolderContext({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setShowRenameModal(true);
+                handleStartRename();
               }}
               className="flex items-center justify-center w-5 h-5 rounded text-text-light hover:text-secondary transition-colors"
             >
@@ -176,18 +182,6 @@ export function FolderContext({
           {renderPathItems()}
         </div>
       </div>
-
-      {showRenameModal && (
-        <RenameModal
-          isOpen={showRenameModal}
-          onClose={() => setShowRenameModal(false)}
-          onRename={handleRename}
-          currentName={currentFolder.name}
-          folders={breadcrumbPath}
-          parentId={currentFolder.parentId}
-          itemId={currentFolder.id}
-        />
-      )}
     </div>
   );
 }
