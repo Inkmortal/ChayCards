@@ -1,5 +1,5 @@
 import { useState, DragEvent } from 'react';
-import { Item, DragState } from '../types';
+import { DragState } from '../types';
 
 interface UseDragAndDropProps {
   onMove?: (sourceId: string, targetId: string | null) => void;

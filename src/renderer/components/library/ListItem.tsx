@@ -1,14 +1,15 @@
 import React, { DragEvent } from 'react';
 import { Icon } from '../ui';
-import { Item, DragState } from './types';
-import { formatDate } from './utils/dateUtils';
+import { DragState } from './types';
+import { FolderItem } from '../../../core/storage/folders/models';
+import { formatDate } from './base/BaseFolderView';
 
 interface ListItemProps {
-  item: Item;
+  item: FolderItem;
   dragState: DragState;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
-  onStartRename: (item: Item) => void;
+  onStartRename: (item: FolderItem) => void;
   onDragStart: (e: DragEvent<HTMLDivElement>, id: string) => void;
   onDragOver: (e: DragEvent<HTMLDivElement>, id: string | null) => void;
   onDragLeave: (e: DragEvent<HTMLDivElement>) => void;

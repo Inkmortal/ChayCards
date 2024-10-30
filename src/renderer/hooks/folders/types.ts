@@ -1,7 +1,4 @@
-import { 
-  Folder, 
-  FolderItem 
-} from '../../../core/storage/folders/models';
+import { Folder, FolderItem } from '../../../core/storage/folders/models';
 import { 
   OperationResult,
   OperationState,
@@ -12,11 +9,11 @@ import {
   DeleteFolderResult,
   ReplaceFolderResult
 } from '../../../core/operations/types';
-import { FolderConflict } from '../../../core/operations/folders/conflicts';
 import { QueuedOperation } from '../../../core/state/operation-queue';
+import { FolderConflict } from '../../../core/operations/folders/conflicts';
 
 /**
- * UI State Types
+ * UI State
  */
 export interface UIFolderState {
   // Core Data
@@ -33,11 +30,11 @@ export interface UIFolderState {
   // Modal State
   itemToRename: FolderItem | null;
   pendingMove: { sourceId: string; targetId: string | null } | null;
-  folderConflict: FolderConflict | null;
   isCreateModalOpen: boolean;
   newFolderName: string;
   createInFolderId: string | null;
   folderError?: string;
+  folderConflict: FolderConflict | null;
 }
 
 /**
@@ -54,33 +51,24 @@ export interface UIStateUpdates {
 }
 
 /**
- * Operation Types
+ * Navigation Utilities
  */
-export interface UIOperationResult extends OperationResult {
-  conflict?: FolderConflict;
+export interface NavigationUtils {
+  navigateBack: () => void;
+  navigateToFolder: (id: string | null) => void;
+  getBreadcrumbPath: (folder: Folder) => Folder[];
 }
 
-export type UICreateFolderResult = CreateFolderResult & { conflict?: FolderConflict };
-export type UIMoveResult = MoveFolderResult & { conflict?: FolderConflict };
-export type UIRenameResult = RenameFolderResult & { conflict?: FolderConflict };
-export type UIDeleteResult = DeleteFolderResult & { conflict?: FolderConflict };
-export type UIReplaceResult = ReplaceFolderResult & { conflict?: FolderConflict };
-
-export type UIRenameOperation = (
-  id: string, 
-  newName: string, 
-  moveAfter?: { targetId: string | null }
-) => Promise<UIRenameResult>;
-
-export type UIMoveOperation = (
-  sourceId: string, 
-  targetId: string | null
-) => Promise<UIMoveResult>;
-
-export type UIReplaceOperation = (
-  sourceId: string, 
-  targetId: string | null
-) => Promise<UIReplaceResult>;
+/**
+ * Conflict Resolution
+ */
+export interface ConflictHandlers {
+  handleConflictResolve: {
+    replace: () => Promise<void>;
+    rename: () => void;
+    cancel: () => void;
+  };
+}
 
 /**
  * Combined Hook Return Type
@@ -88,13 +76,15 @@ export type UIReplaceOperation = (
 export interface UseFolderStateReturn extends 
   UIFolderState, 
   UIStateUpdates, 
-  UIOperationHandlers {
-  // Core operations
-  createFolder: (data: { name: string }) => Promise<UICreateFolderResult>;
-  moveFolder: UIMoveOperation;
-  renameFolder: UIRenameOperation;
-  replaceFolder: UIReplaceOperation;
-  deleteFolder: (id: string) => Promise<UIDeleteResult>;
+  UIOperationHandlers,
+  NavigationUtils,
+  ConflictHandlers {
+  // Core operations (using core types directly)
+  createFolder: (data: { name: string }) => Promise<CreateFolderResult>;
+  moveFolder: (sourceId: string, targetId: string | null) => Promise<MoveFolderResult & { conflict?: FolderConflict }>;
+  renameFolder: (id: string, newName: string, moveAfter?: { targetId: string | null }) => Promise<RenameFolderResult>;
+  replaceFolder: (sourceId: string, targetId: string | null) => Promise<ReplaceFolderResult>;
+  deleteFolder: (id: string) => Promise<DeleteFolderResult>;
   
   // Navigation
   setCurrentFolder: (id: string | null) => void;
@@ -102,4 +92,7 @@ export interface UseFolderStateReturn extends
   // Queue management
   resolveConflict: () => void;
   cancelOperation: () => void;
+
+  // Folder creation
+  handleCreateFolder: () => Promise<void>;
 }

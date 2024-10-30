@@ -6,9 +6,9 @@ export function DocumentsSection() {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm">
-        <span className="text-secondary">{documentCount}</span>
-        <span className="text-text-light"> {documentCount === 1 ? 'document' : 'documents'}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-lg font-semibold text-text">Documents</span>
+        <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-secondary-bg text-secondary">{documentCount}</span>
       </div>
       <EmptyState
         icon={

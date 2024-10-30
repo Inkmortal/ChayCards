@@ -2,7 +2,13 @@ import React, { useState, DragEvent, MouseEvent } from 'react';
 import { Icon } from '../Icon';
 import { RenameModal } from '../../library/RenameModal';
 import { useContextMenu } from '../../../contexts/ContextMenuContext';
-import { TreeNodeProps } from './types';
+import { TreeViewProps } from '../../library/types';
+import { Folder } from '../../../../core/storage/folders/models';
+
+interface TreeNodeProps extends TreeViewProps {
+  item: Folder;
+  level: number;
+}
 
 export function TreeNode({ 
   item, 
@@ -67,11 +73,8 @@ export function TreeNode({
           label: 'Rename',
           icon: '✏️',
           onClick: () => setItemToRename({
-            id: item.id,
-            name: item.name,
-            type: 'folder',
-            modifiedAt: item.modifiedAt,
-            createdAt: item.createdAt
+            ...item,
+            type: 'folder'
           })
         }
       ], { x: e.clientX, y: e.clientY });

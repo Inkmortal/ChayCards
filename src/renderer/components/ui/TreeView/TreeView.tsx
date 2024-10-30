@@ -1,7 +1,7 @@
 import React, { DragEvent } from 'react';
 import { Icon } from '../Icon';
 import { TreeNode } from './TreeNode';
-import { TreeViewProps } from './types';
+import { TreeViewProps } from '../../library/types';
 import { FolderConflictModal } from '../../library/FolderConflictModal';
 
 export function TreeView({ 
@@ -49,11 +49,9 @@ export function TreeView({
           targetId: folderConflict.targetId
         });
         setItemToRename({
-          id: sourceItem.id,
+          ...sourceItem,
           name: folderConflict.suggestedName,
-          type: 'folder',
-          modifiedAt: sourceItem.modifiedAt,
-          createdAt: sourceItem.createdAt
+          type: 'folder'
         });
       }
     }

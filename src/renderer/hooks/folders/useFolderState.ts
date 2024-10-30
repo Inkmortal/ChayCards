@@ -4,20 +4,11 @@ import { StorageInterface } from '../../../core/storage/types';
 import { 
   UIFolderState, 
   UIStateUpdates,
-  UICreateFolderResult,
-  UIMoveResult,
-  UIRenameResult,
-  UIReplaceResult,
-  UIDeleteResult,
-  UIRenameOperation,
-  UIMoveOperation,
-  UIReplaceOperation,
   UseFolderStateReturn
 } from './types';
 import { CreateFolderData } from '../../../core/operations/types';
-import { FolderItem, toFolderItem } from '../../../core/storage/folders/models';
+import { Folder, FolderItem } from '../../../core/storage/folders/models';
 import { FolderConflict, NameConflictResult } from '../../../core/operations/folders/conflicts';
-import { QueuedOperation } from '../../../core/state/operation-queue';
 
 declare global {
   interface Window {
@@ -85,6 +76,70 @@ export function useFolderState(): UseFolderStateReturn {
     }
   };
 
+  // Navigation Utilities
+  const navigateBack = () => {
+    if (coreState.currentFolder?.parentId !== undefined) {
+      stateManager.setCurrentFolder(coreState.currentFolder.parentId);
+    }
+  };
+
+  const navigateToFolder = (id: string | null) => {
+    stateManager.setCurrentFolder(id);
+  };
+
+  const getBreadcrumbPath = (folder: Folder): Folder[] => {
+    const path: Folder[] = [];
+    let current: Folder | undefined = folder;
+    
+    while (current) {
+      path.unshift(current);
+      current = coreState.folders.find(f => f.id === current?.parentId);
+    }
+
+    return path;
+  };
+
+  // Conflict Resolution
+  const handleConflictResolve = {
+    replace: async () => {
+      if (!uiState.folderConflict) return;
+      const result = await replaceFolder(
+        uiState.folderConflict.sourceId, 
+        uiState.folderConflict.targetId
+      );
+      if (result.success) {
+        updateUIState({ folderConflict: null });
+      }
+    },
+    rename: () => {
+      if (!uiState.folderConflict) return;
+      updateUIState({
+        pendingMove: {
+          sourceId: uiState.folderConflict.sourceId,
+          targetId: uiState.folderConflict.targetId
+        }
+      });
+      const sourceItem = coreState.folders.find(f => f.id === uiState.folderConflict?.sourceId);
+      if (sourceItem) {
+        updateUIState({
+          itemToRename: {
+            ...sourceItem,
+            name: uiState.folderConflict.suggestedName,
+            type: 'folder'
+          }
+        });
+      }
+      updateUIState({ folderConflict: null });
+    },
+    cancel: () => {
+      updateUIState({
+        folderConflict: null,
+        pendingMove: null,
+        itemToRename: null
+      });
+    }
+  };
+
   // UI Actions
   const openCreateModal: UIStateUpdates['openCreateModal'] = (parentId) => {
     updateUIState({
@@ -115,7 +170,18 @@ export function useFolderState(): UseFolderStateReturn {
   };
 
   // Core Operations
-  const createFolder = async (data: { name: string }): Promise<UICreateFolderResult> => {
+  const handleCreateFolder = async () => {
+    if (!uiState.folderError && uiState.newFolderName.trim()) {
+      const result = await createFolder({
+        name: uiState.newFolderName.trim()
+      });
+      if (result.success) {
+        closeCreateModal();
+      }
+    }
+  };
+
+  const createFolder = async (data: { name: string }) => {
     const parentId = uiState.createInFolderId ?? coreState.currentFolder?.id ?? null;
     const result = await stateManager.createFolder({
       name: data.name,
@@ -126,33 +192,26 @@ export function useFolderState(): UseFolderStateReturn {
     return result;
   };
 
-  const moveFolder: UIMoveOperation = async (sourceId, targetId) => {
+  const moveFolder = async (sourceId: string, targetId: string | null) => {
     const result = await stateManager.moveFolder({ sourceId, targetId });
     
-    if (!result.success) {
-      if (result.data?.type === 'name') {
-        const nameConflict = result.data as NameConflictResult;
-        const conflict: FolderConflict = {
-          sourceId,
-          targetId,
-          originalName: nameConflict.originalName,
-          suggestedName: nameConflict.suggestedName
-        };
-        const uiResult: UIMoveResult = {
-          ...result,
-          conflict
-        };
-        handleOperationResult(uiResult);
-        return uiResult;
-      }
-      return result;
+    if (!result.success && result.data?.type === 'name') {
+      const nameConflict = result.data as NameConflictResult;
+      const conflict: FolderConflict = {
+        sourceId,
+        targetId,
+        originalName: nameConflict.originalName,
+        suggestedName: nameConflict.suggestedName
+      };
+      handleOperationResult({ ...result, conflict });
+      return { ...result, conflict };
     }
 
-    updateUIState({ folderConflict: null });
+    handleOperationResult(result);
     return result;
   };
 
-  const renameFolder: UIRenameOperation = async (id, newName, moveAfter) => {
+  const renameFolder = async (id: string, newName: string, moveAfter?: { targetId: string | null }) => {
     const result = await stateManager.renameFolder({ id, newName });
     handleOperationResult(result);
     if (result.success && moveAfter) {
@@ -165,13 +224,13 @@ export function useFolderState(): UseFolderStateReturn {
     return result;
   };
 
-  const replaceFolder: UIReplaceOperation = async (sourceId, targetId) => {
+  const replaceFolder = async (sourceId: string, targetId: string | null) => {
     const result = await stateManager.replaceFolder({ sourceId, targetId });
     handleOperationResult(result);
     return result;
   };
 
-  const deleteFolder = async (id: string): Promise<UIDeleteResult> => {
+  const deleteFolder = async (id: string) => {
     const result = await stateManager.deleteFolder(id);
     handleOperationResult(result);
     return result;
@@ -220,9 +279,16 @@ export function useFolderState(): UseFolderStateReturn {
     renameFolder,
     replaceFolder,
     deleteFolder,
+    handleCreateFolder,
 
     // Navigation
     setCurrentFolder: stateManager.setCurrentFolder.bind(stateManager),
+    navigateBack,
+    navigateToFolder,
+    getBreadcrumbPath,
+
+    // Conflict resolution
+    handleConflictResolve,
 
     // Queue management
     resolveConflict,

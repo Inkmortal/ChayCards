@@ -17,6 +17,13 @@ export interface FolderItem extends FolderBase {
   parentId: string | null;
 }
 
+// Storage data structure
+export interface FolderData {
+  folders: Folder[];
+  version: number;
+  lastBackup: string;
+}
+
 // Utility function to convert between types
 export function toFolderItem(folder: Folder): FolderItem {
   return {

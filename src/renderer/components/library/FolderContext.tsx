@@ -1,10 +1,10 @@
 import React, { DragEvent, useState, useEffect } from 'react';
 import { Icon } from '../ui';
-import { Item } from './types';
+import { FolderItem } from '../../../core/storage/folders/models';
 import { Folder } from '../../../core/storage/folders/models';
 
 interface FolderContextProps {
-  currentFolder: Folder;
+  currentFolder?: Folder | null;
   breadcrumbPath: Folder[];
   onNavigateBack: () => void;
   onNavigateToFolder: (id: string | null) => void;
@@ -15,8 +15,8 @@ interface FolderContextProps {
   }>;
   onRenameFolder?: (id: string, newName: string) => void;
   // Rename state
-  itemToRename: Item | null;
-  setItemToRename: (item: Item | null) => void;
+  itemToRename: FolderItem | null;
+  setItemToRename: (item: FolderItem | null) => void;
 }
 
 export function FolderContext({ 
@@ -80,13 +80,10 @@ export function FolderContext({
   };
 
   const handleStartRename = () => {
-    if (onRenameFolder) {
+    if (onRenameFolder && currentFolder) {
       setItemToRename({
-        id: currentFolder.id,
-        name: currentFolder.name,
-        type: 'folder',
-        modifiedAt: currentFolder.modifiedAt,
-        createdAt: currentFolder.createdAt
+        ...currentFolder,
+        type: 'folder'
       });
     }
   };

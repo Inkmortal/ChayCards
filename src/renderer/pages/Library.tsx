@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   LibraryHeader, 
   FolderContext, 
@@ -8,9 +8,6 @@ import {
   DocumentsSection
 } from '../components/library';
 import { useFolders } from '../hooks/folders';
-import { Item } from '../components/library/types';
-import { FolderConflict } from '../../core/operations/folders/conflicts';
-import { Folder } from '../../core/storage/folders/models';
 
 export function Library() {
   const {
@@ -24,12 +21,18 @@ export function Library() {
     isCreateModalOpen,
     newFolderName,
     folderError,
+    itemToRename,
+    setItemToRename,
+    pendingMove,
+    setPendingMove,
+    folderConflict,
+    setFolderConflict,
 
-    // Create folder
+    // Modal actions
     openCreateModal,
     closeCreateModal,
     setNewFolderName,
-    createFolder,
+    handleCreateFolder,
 
     // Operations
     moveFolder,
@@ -38,89 +41,22 @@ export function Library() {
     deleteFolder,
 
     // Navigation
-    setCurrentFolder
+    setCurrentFolder,
+    navigateBack,
+    navigateToFolder,
+    getBreadcrumbPath,
+
+    // Conflict resolution
+    handleConflictResolve
   } = useFolders();
 
-  // Shared rename state
-  const [itemToRename, setItemToRename] = useState<Item | null>(null);
-  const [pendingMove, setPendingMove] = useState<{
-    sourceId: string;
-    targetId: string | null;
-  } | null>(null);
-  const [folderConflict, setFolderConflict] = useState<FolderConflict | null>(null);
-
-  // Conflict resolution handlers
-  const handleConflictResolve = {
-    replace: async () => {
-      if (!folderConflict) return;
-      const result = await replaceFolder(folderConflict.sourceId, folderConflict.targetId);
-      if (result.success) {
-        setFolderConflict(null);
-      }
-    },
-    rename: () => {
-      if (!folderConflict) return;
-      setPendingMove({
-        sourceId: folderConflict.sourceId,
-        targetId: folderConflict.targetId
-      });
-      const sourceItem = folders.find(f => f.id === folderConflict.sourceId);
-      if (sourceItem) {
-        setItemToRename({
-          id: sourceItem.id,
-          name: folderConflict.suggestedName,
-          type: 'folder',
-          modifiedAt: sourceItem.modifiedAt,
-          createdAt: sourceItem.createdAt
-        });
-      }
-      setFolderConflict(null);
-    },
-    cancel: () => {
-      setFolderConflict(null);
-      setPendingMove(null);
-      setItemToRename(null);
-    }
-  };
-
-  // Handle folder creation
-  const handleCreateFolder = async () => {
-    if (!folderError && newFolderName.trim()) {
-      const result = await createFolder({
-        name: newFolderName.trim(),
-        parentId: currentFolder?.id ?? null
-      });
-      if (result.success) {
-        closeCreateModal();
-      }
-    }
-  };
-
-  // Move handler that manages conflicts
+  // Move handler with conflict management
   const handleMove = async (sourceId: string, targetId: string | null) => {
     const result = await moveFolder(sourceId, targetId);
     if (!result.success && result.conflict) {
       setFolderConflict(result.conflict);
     }
     return result;
-  };
-
-  // Navigation handlers
-  const navigateFolder = (id: string) => setCurrentFolder(id);
-  const navigateBack = () => currentFolder?.parentId !== undefined && setCurrentFolder(currentFolder.parentId);
-  const navigateToFolder = (id: string | null) => setCurrentFolder(id);
-
-  // Build breadcrumb path
-  const getBreadcrumbPath = (folder: Folder): Folder[] => {
-    const path: Folder[] = [];
-    let current: Folder | undefined = folder;
-    
-    while (current) {
-      path.unshift(current);
-      current = folders.find(f => f.id === current?.parentId);
-    }
-
-    return path;
   };
 
   return (
@@ -144,18 +80,16 @@ export function Library() {
         <div className="p-6 space-y-8">
           <LibraryHeader onCreateFolder={() => openCreateModal(currentFolder?.id || null)} />
 
-          {currentFolder && (
-            <FolderContext
-              currentFolder={currentFolder}
-              breadcrumbPath={getBreadcrumbPath(currentFolder)}
-              onNavigateBack={navigateBack}
-              onNavigateToFolder={navigateToFolder}
-              onMoveFolder={handleMove}
-              onRenameFolder={renameFolder}
-              itemToRename={itemToRename}
-              setItemToRename={setItemToRename}
-            />
-          )}
+          <FolderContext
+            currentFolder={currentFolder}
+            breadcrumbPath={currentFolder ? getBreadcrumbPath(currentFolder) : []}
+            onNavigateBack={navigateBack}
+            onNavigateToFolder={navigateToFolder}
+            onMoveFolder={handleMove}
+            onRenameFolder={renameFolder}
+            itemToRename={itemToRename}
+            setItemToRename={setItemToRename}
+          />
 
           <div className="space-y-8">
             <FolderGrid
@@ -163,7 +97,7 @@ export function Library() {
               currentFolder={currentFolder}
               allFolders={folders}
               onCreateFolder={() => openCreateModal(currentFolder?.id || null)}
-              onNavigateFolder={navigateFolder}
+              onNavigateFolder={(id) => setCurrentFolder(id)}
               onDeleteFolder={deleteFolder}
               onRenameFolder={renameFolder}
               onMoveFolder={handleMove}

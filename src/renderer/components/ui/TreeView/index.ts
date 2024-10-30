@@ -1,2 +1,1 @@
-export * from './TreeView';
-export * from './types';
+export * from "./TreeView";
