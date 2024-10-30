@@ -1,40 +1,51 @@
 import { useState, useEffect } from 'react';
 import { FolderStateManager } from '../../../core/state/folders';
-import { ElectronFolderStorage } from '../../../services/storage';
-import { validateFolderName } from '../../../core/operations/folders/validation';
+import { StorageInterface } from '../../../core/storage/types';
 import { 
   UIFolderState, 
   UIStateUpdates,
-  UIOperationResult,
+  UICreateFolderResult,
+  UIMoveResult,
+  UIRenameResult,
+  UIReplaceResult,
+  UIDeleteResult,
   UIRenameOperation,
   UIMoveOperation,
-  UIReplaceOperation
+  UIReplaceOperation,
+  UseFolderStateReturn
 } from './types';
-import { CreateFolderData, RenameFolderData } from '../../../core/operations/types';
-import { Item } from '../../components/library/types';
+import { CreateFolderData } from '../../../core/operations/types';
+import { FolderItem, toFolderItem } from '../../../core/storage/folders/models';
 import { FolderConflict, NameConflictResult } from '../../../core/operations/folders/conflicts';
+import { QueuedOperation } from '../../../core/state/operation-queue';
 
-// Singleton state manager
-const storage = new ElectronFolderStorage();
-const stateManager = new FolderStateManager(storage);
+declare global {
+  interface Window {
+    storage: StorageInterface;
+  }
+}
 
-export function useFolderState() {
-  // Core state subscription
+const stateManager = new FolderStateManager(window.storage);
+
+export function useFolderState(): UseFolderStateReturn {
   const [coreState, setCoreState] = useState(() => ({
     folders: stateManager.getState().folders,
     currentFolder: stateManager.getCurrentFolder(),
     currentFolders: stateManager.getCurrentFolders(),
-    isLoading: stateManager.getState().isLoading
+    isLoading: stateManager.getState().isLoading,
+    currentOperation: stateManager.getState().currentOperation
   }));
 
-  // UI state
   const [uiState, setUIState] = useState<Omit<UIFolderState, keyof typeof coreState>>({
     itemToRename: null,
     pendingMove: null,
     folderConflict: null,
     isCreateModalOpen: false,
     newFolderName: '',
-    createInFolderId: null
+    createInFolderId: null,
+    isProcessing: false,
+    hasConflict: false,
+    folderError: undefined
   });
 
   useEffect(() => {
@@ -43,17 +54,38 @@ export function useFolderState() {
         folders: state.folders,
         currentFolder: stateManager.getCurrentFolder(),
         currentFolders: stateManager.getCurrentFolders(),
-        isLoading: state.isLoading
+        isLoading: state.isLoading,
+        currentOperation: state.currentOperation
       });
     });
   }, []);
 
-  // UI State Updates
-  const updateUIState = (updates: Partial<typeof uiState>) => {
+  useEffect(() => {
+    const operation = coreState.currentOperation;
+    if (operation) {
+      setUIState(current => ({
+        ...current,
+        isProcessing: operation.status === 'processing',
+        hasConflict: operation.status === 'conflict'
+      }));
+    }
+  }, [coreState.currentOperation]);
+
+  const updateUIState = (updates: Partial<Omit<UIFolderState, keyof typeof coreState>>) => {
     setUIState(current => ({ ...current, ...updates }));
   };
 
-  // Create Folder UI
+  const handleOperationResult = <T extends { success: boolean, error?: string, conflict?: FolderConflict }>(result: T) => {
+    if (!result.success) {
+      if (result.conflict) {
+        updateUIState({ folderConflict: result.conflict });
+      }
+    } else {
+      updateUIState({ folderConflict: null });
+    }
+  };
+
+  // UI Actions
   const openCreateModal: UIStateUpdates['openCreateModal'] = (parentId) => {
     updateUIState({
       isCreateModalOpen: true,
@@ -73,7 +105,6 @@ export function useFolderState() {
   };
 
   const setNewFolderName: UIStateUpdates['setNewFolderName'] = (name) => {
-    // Synchronous validation for immediate feedback
     const siblings = coreState.folders.filter(f => f.parentId === uiState.createInFolderId);
     const exists = siblings.some(f => f.name.toLowerCase() === name.toLowerCase());
     
@@ -83,54 +114,78 @@ export function useFolderState() {
     });
   };
 
-  // Core Operations with UI Types
-  const createFolder = async (data: CreateFolderData): Promise<UIOperationResult> => {
-    const result = await stateManager.createFolder(data);
-    return {
-      success: result.success,
-      error: result.error
-    };
+  // Core Operations
+  const createFolder = async (data: { name: string }): Promise<UICreateFolderResult> => {
+    const parentId = uiState.createInFolderId ?? coreState.currentFolder?.id ?? null;
+    const result = await stateManager.createFolder({
+      name: data.name,
+      parentId
+    });
+
+    handleOperationResult(result);
+    return result;
   };
 
   const moveFolder: UIMoveOperation = async (sourceId, targetId) => {
     const result = await stateManager.moveFolder({ sourceId, targetId });
-    if (!result.success && result.data) {
-      // Check if it's a name conflict
-      if (result.data.type === 'name') {
+    
+    if (!result.success) {
+      if (result.data?.type === 'name') {
         const nameConflict = result.data as NameConflictResult;
-        // Convert to UI conflict
         const conflict: FolderConflict = {
           sourceId,
           targetId,
           originalName: nameConflict.originalName,
           suggestedName: nameConflict.suggestedName
         };
-        return {
-          success: false,
-          error: result.error,
+        const uiResult: UIMoveResult = {
+          ...result,
           conflict
         };
+        handleOperationResult(uiResult);
+        return uiResult;
       }
+      return result;
     }
-    return { success: true };
+
+    updateUIState({ folderConflict: null });
+    return result;
   };
 
   const renameFolder: UIRenameOperation = async (id, newName, moveAfter) => {
     const result = await stateManager.renameFolder({ id, newName });
+    handleOperationResult(result);
     if (result.success && moveAfter) {
-      await stateManager.moveFolder({ 
+      const moveResult = await stateManager.moveFolder({ 
         sourceId: id, 
         targetId: moveAfter.targetId 
       });
+      handleOperationResult(moveResult);
     }
+    return result;
   };
 
   const replaceFolder: UIReplaceOperation = async (sourceId, targetId) => {
     const result = await stateManager.replaceFolder({ sourceId, targetId });
-    return {
-      success: result.success,
-      error: result.error
-    };
+    handleOperationResult(result);
+    return result;
+  };
+
+  const deleteFolder = async (id: string): Promise<UIDeleteResult> => {
+    const result = await stateManager.deleteFolder(id);
+    handleOperationResult(result);
+    return result;
+  };
+
+  // Queue Management
+  const resolveConflict = () => {
+    stateManager.resumeOperationQueue();
+    updateUIState({ folderConflict: null });
+  };
+
+  const cancelOperation = () => {
+    stateManager.clearOperationQueue();
+    updateUIState({ folderConflict: null });
   };
 
   return {
@@ -144,7 +199,7 @@ export function useFolderState() {
     openCreateModal,
     closeCreateModal,
     setNewFolderName,
-    setItemToRename: (item: Item | null) => updateUIState({ itemToRename: item }),
+    setItemToRename: (item: FolderItem | null) => updateUIState({ itemToRename: item }),
     setPendingMove: (move: { sourceId: string; targetId: string | null } | null) => 
       updateUIState({ pendingMove: move }),
     setFolderConflict: (conflict: FolderConflict | null) => 
@@ -159,14 +214,18 @@ export function useFolderState() {
       createInFolderId: null
     }),
 
-    // Core operations with UI types
+    // Core operations
     createFolder,
     moveFolder,
     renameFolder,
     replaceFolder,
-    deleteFolder: stateManager.deleteFolder.bind(stateManager),
+    deleteFolder,
 
     // Navigation
-    setCurrentFolder: stateManager.setCurrentFolder.bind(stateManager)
+    setCurrentFolder: stateManager.setCurrentFolder.bind(stateManager),
+
+    // Queue management
+    resolveConflict,
+    cancelOperation
   };
 }

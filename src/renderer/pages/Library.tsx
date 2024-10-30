@@ -7,7 +7,7 @@ import {
   Sidebar,
   DocumentsSection
 } from '../components/library';
-import { useFolders } from '../hooks/folders/useFolders';
+import { useFolders } from '../hooks/folders';
 import { Item } from '../components/library/types';
 import { FolderConflict } from '../../core/operations/folders/conflicts';
 import { Folder } from '../../core/storage/folders/models';
@@ -29,7 +29,7 @@ export function Library() {
     openCreateModal,
     closeCreateModal,
     setNewFolderName,
-    handleCreateFolder,
+    createFolder,
 
     // Operations
     moveFolder,
@@ -38,9 +38,7 @@ export function Library() {
     deleteFolder,
 
     // Navigation
-    navigateFolder,
-    navigateBack,
-    navigateToFolder
+    setCurrentFolder
   } = useFolders();
 
   // Shared rename state
@@ -85,6 +83,19 @@ export function Library() {
     }
   };
 
+  // Handle folder creation
+  const handleCreateFolder = async () => {
+    if (!folderError && newFolderName.trim()) {
+      const result = await createFolder({
+        name: newFolderName.trim(),
+        parentId: currentFolder?.id ?? null
+      });
+      if (result.success) {
+        closeCreateModal();
+      }
+    }
+  };
+
   // Move handler that manages conflicts
   const handleMove = async (sourceId: string, targetId: string | null) => {
     const result = await moveFolder(sourceId, targetId);
@@ -93,6 +104,11 @@ export function Library() {
     }
     return result;
   };
+
+  // Navigation handlers
+  const navigateFolder = (id: string) => setCurrentFolder(id);
+  const navigateBack = () => currentFolder?.parentId !== undefined && setCurrentFolder(currentFolder.parentId);
+  const navigateToFolder = (id: string | null) => setCurrentFolder(id);
 
   // Build breadcrumb path
   const getBreadcrumbPath = (folder: Folder): Folder[] => {

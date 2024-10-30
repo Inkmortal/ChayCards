@@ -1,19 +1,31 @@
-/**
- * Represents a folder in the system
- */
-export interface Folder {
+// Base model for all folder-related entities
+export interface FolderBase {
   id: string;
   name: string;
-  parentId: string | null;
-  createdAt: string;
   modifiedAt: string;
+  createdAt: string;
 }
 
-/**
- * Represents the persistent storage structure for folders
- */
-export interface FolderData {
-  folders: Folder[];
-  version: number;
-  lastBackup: string;
+// Core folder model
+export interface Folder extends FolderBase {
+  parentId: string | null;
+}
+
+// UI representation of a folder
+export interface FolderItem extends FolderBase {
+  type: 'folder';
+  parentId: string | null;
+}
+
+// Utility function to convert between types
+export function toFolderItem(folder: Folder): FolderItem {
+  return {
+    ...folder,
+    type: 'folder'
+  };
+}
+
+export function fromFolderItem(item: FolderItem): Folder {
+  const { type, ...folder } = item;
+  return folder;
 }

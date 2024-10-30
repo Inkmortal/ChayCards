@@ -9,11 +9,13 @@ import {
   ReplaceFolderData,
   OperationResult 
 } from '../operations/types';
+import { OperationQueue, QueuedOperation } from './operation-queue';
 
 export interface FolderState {
   folders: Folder[];
   currentFolderId: string | null;
   isLoading: boolean;
+  currentOperation: QueuedOperation | null;
 }
 
 type StateListener = (state: FolderState) => void;
@@ -23,16 +25,27 @@ export class FolderStateManager {
   private listeners: Set<StateListener>;
   private operations: FolderOperations;
   private storage: StorageInterface;
+  private operationQueue: OperationQueue;
 
   constructor(storage: StorageInterface) {
     this.state = {
       folders: [],
       currentFolderId: null,
-      isLoading: true
+      isLoading: true,
+      currentOperation: null
     };
     this.listeners = new Set();
     this.operations = new FolderOperations(storage);
     this.storage = storage;
+    this.operationQueue = new OperationQueue();
+
+    // Subscribe to operation queue updates
+    setInterval(() => {
+      const currentOp = this.operationQueue.getCurrentOperation();
+      if (currentOp !== this.state.currentOperation) {
+        this.setState({ currentOperation: currentOp });
+      }
+    }, 100);
 
     this.loadFolders();
   }
@@ -86,15 +99,20 @@ export class FolderStateManager {
 
   // Core Operations - Each with single responsibility
   async createFolder(data: CreateFolderData): Promise<OperationResult<Folder>> {
-    const result = await this.operations.createFolder(data, this.state.folders);
-    if (result.success && result.data) {
-      this.setState({ folders: [...this.state.folders, result.data] });
-    }
-    return result;
+    return this.operationQueue.queueOperation({
+      type: 'create',
+      execute: async () => {
+        const result = await this.operations.createFolder(data, this.state.folders);
+        if (result.success && result.data) {
+          this.setState({ folders: [...this.state.folders, result.data] });
+        }
+        return result;
+      }
+    });
   }
 
   async moveFolder(data: MoveFolderData): Promise<OperationResult<FolderConflictResult>> {
-    // Always check for conflicts first
+    // Check for conflicts before queueing
     const conflict = detectMoveConflict(data.sourceId, data.targetId, this.state.folders);
     if (conflict) {
       return {
@@ -104,93 +122,113 @@ export class FolderStateManager {
       };
     }
 
-    // Proceed with move if no conflicts
-    const result = await this.operations.moveFolder(data, this.state.folders);
-    if (result.success) {
-      const updatedFolders = this.state.folders.map(folder => 
-        folder.id === data.sourceId
-          ? { ...folder, parentId: data.targetId, modifiedAt: new Date().toISOString() }
-          : folder
-      );
-      this.setState({ folders: updatedFolders });
-    }
-    return result;
+    // Queue the move operation
+    return this.operationQueue.queueOperation({
+      type: 'move',
+      execute: async () => {
+        const result = await this.operations.moveFolder(data, this.state.folders);
+        if (result.success) {
+          const updatedFolders = this.state.folders.map(folder => 
+            folder.id === data.sourceId
+              ? { ...folder, parentId: data.targetId, modifiedAt: new Date().toISOString() }
+              : folder
+          );
+          this.setState({ folders: updatedFolders });
+        }
+        return result;
+      }
+    });
   }
 
   async replaceFolder(data: ReplaceFolderData): Promise<OperationResult> {
-    const result = await this.operations.replaceFolder(data, this.state.folders);
-    
-    if (result.success) {
-      const sourceFolder = this.state.folders.find(f => f.id === data.sourceId);
-      if (!sourceFolder) return { success: false, error: 'Source folder not found' };
+    return this.operationQueue.queueOperation({
+      type: 'replace',
+      execute: async () => {
+        const result = await this.operations.replaceFolder(data, this.state.folders);
+        
+        if (result.success) {
+          const sourceFolder = this.state.folders.find(f => f.id === data.sourceId);
+          if (!sourceFolder) return { success: false, error: 'Source folder not found' };
 
-      // Find folders to delete
-      const foldersToDelete = new Set<string>();
-      const conflictingFolders = this.state.folders.filter(folder => 
-        folder.id !== data.sourceId &&
-        folder.parentId === data.targetId &&
-        folder.name.toLowerCase() === sourceFolder.name.toLowerCase()
-      );
+          // Find folders to delete
+          const foldersToDelete = new Set<string>();
+          const conflictingFolders = this.state.folders.filter(folder => 
+            folder.id !== data.sourceId &&
+            folder.parentId === data.targetId &&
+            folder.name.toLowerCase() === sourceFolder.name.toLowerCase()
+          );
 
-      // Get all subfolders of conflicting folders
-      conflictingFolders.forEach(folder => {
-        const subFolders = this.getAllSubFolders(folder.id);
-        subFolders.forEach(f => foldersToDelete.add(f.id));
-        foldersToDelete.add(folder.id);
-      });
+          // Get all subfolders of conflicting folders
+          conflictingFolders.forEach(folder => {
+            const subFolders = this.getAllSubFolders(folder.id);
+            subFolders.forEach(f => foldersToDelete.add(f.id));
+            foldersToDelete.add(folder.id);
+          });
 
-      // Update folders state
-      const updatedFolders = this.state.folders
-        .filter(folder => !foldersToDelete.has(folder.id))
-        .map(folder => 
-          folder.id === data.sourceId
-            ? { ...folder, parentId: data.targetId, modifiedAt: new Date().toISOString() }
-            : folder
-        );
+          // Update folders state
+          const updatedFolders = this.state.folders
+            .filter(folder => !foldersToDelete.has(folder.id))
+            .map(folder => 
+              folder.id === data.sourceId
+                ? { ...folder, parentId: data.targetId, modifiedAt: new Date().toISOString() }
+                : folder
+            );
 
-      // Update state and handle current folder if deleted
-      this.setState({ 
-        folders: updatedFolders,
-        currentFolderId: foldersToDelete.has(this.state.currentFolderId || '') 
-          ? data.targetId 
-          : this.state.currentFolderId
-      });
-    }
-    return result;
+          // Update state and handle current folder if deleted
+          this.setState({ 
+            folders: updatedFolders,
+            currentFolderId: foldersToDelete.has(this.state.currentFolderId || '') 
+              ? data.targetId 
+              : this.state.currentFolderId
+          });
+        }
+        return result;
+      }
+    });
   }
 
   async renameFolder(data: RenameFolderData): Promise<OperationResult> {
-    const result = await this.operations.renameFolder(data, this.state.folders);
-    if (result.success) {
-      const updatedFolders = this.state.folders.map(folder => 
-        folder.id === data.id
-          ? { ...folder, name: data.newName, modifiedAt: new Date().toISOString() }
-          : folder
-      );
-      this.setState({ folders: updatedFolders });
-    }
-    return result;
+    return this.operationQueue.queueOperation({
+      type: 'rename',
+      execute: async () => {
+        const result = await this.operations.renameFolder(data, this.state.folders);
+        if (result.success) {
+          const updatedFolders = this.state.folders.map(folder => 
+            folder.id === data.id
+              ? { ...folder, name: data.newName, modifiedAt: new Date().toISOString() }
+              : folder
+          );
+          this.setState({ folders: updatedFolders });
+        }
+        return result;
+      }
+    });
   }
 
   async deleteFolder(id: string): Promise<OperationResult> {
-    const result = await this.operations.deleteFolder(id, this.state.folders);
-    if (result.success) {
-      // Get all subfolders to delete
-      const foldersToDelete = new Set([id]);
-      const subFolders = this.getAllSubFolders(id);
-      subFolders.forEach(f => foldersToDelete.add(f.id));
+    return this.operationQueue.queueOperation({
+      type: 'delete',
+      execute: async () => {
+        const result = await this.operations.deleteFolder(id, this.state.folders);
+        if (result.success) {
+          // Get all subfolders to delete
+          const foldersToDelete = new Set([id]);
+          const subFolders = this.getAllSubFolders(id);
+          subFolders.forEach(f => foldersToDelete.add(f.id));
 
-      // Update folders state
-      const updatedFolders = this.state.folders.filter(f => !foldersToDelete.has(f.id));
-      
-      this.setState({ 
-        folders: updatedFolders,
-        currentFolderId: foldersToDelete.has(this.state.currentFolderId || '') 
-          ? this.state.folders.find(f => f.id === id)?.parentId || null 
-          : this.state.currentFolderId
-      });
-    }
-    return result;
+          // Update folders state
+          const updatedFolders = this.state.folders.filter(f => !foldersToDelete.has(f.id));
+          
+          this.setState({ 
+            folders: updatedFolders,
+            currentFolderId: foldersToDelete.has(this.state.currentFolderId || '') 
+              ? this.state.folders.find(f => f.id === id)?.parentId || null 
+              : this.state.currentFolderId
+          });
+        }
+        return result;
+      }
+    });
   }
 
   // Navigation
@@ -204,5 +242,24 @@ export class FolderStateManager {
 
   getCurrentFolders(): Folder[] {
     return this.state.folders.filter(f => f.parentId === this.state.currentFolderId);
+  }
+
+  // Operation Queue Management
+  resumeOperationQueue() {
+    this.operationQueue.resumeQueue();
+  }
+
+  clearOperationQueue() {
+    this.operationQueue.clearQueue();
+  }
+
+  // Check if an operation is in progress
+  isOperationInProgress(): boolean {
+    return this.state.currentOperation?.status === 'processing';
+  }
+
+  // Get current operation details
+  getCurrentOperation(): QueuedOperation | null {
+    return this.state.currentOperation;
   }
 }

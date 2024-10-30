@@ -1,9 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { StorageInterface } from '../core/storage/types';
+import { StorageError, StorageErrorCode } from '../core/storage/base';
 
-// Log that preload script is starting
-console.log('Preload script starting...');
-
-// Create the API object
+// Create the API object with proper error handling
 const api = {
   invoke: async (channel: string, data?: any) => {
     const validChannels = ['load-folders', 'save-folders', 'restore-folders'];
@@ -15,10 +14,17 @@ const api = {
         return result;
       } catch (error) {
         console.error(`Preload: Error in ${channel}:`, error);
-        throw error;
+        throw new StorageError(
+          `Failed to execute ${channel}`,
+          StorageErrorCode.STORAGE_ERROR,
+          { originalError: error }
+        );
       }
     }
-    throw new Error(`Invalid channel: ${channel}`);
+    throw new StorageError(
+      `Invalid channel: ${channel}`,
+      StorageErrorCode.INVALID_DATA
+    );
   },
   on: (channel: string, callback: Function) => {
     const validChannels = ['folders-updated'];
@@ -41,13 +47,28 @@ const api = {
   }
 };
 
-// Expose the API to the renderer process
-try {
-  console.log('Preload: Exposing API to renderer process');
-  contextBridge.exposeInMainWorld('api', api);
-  console.log('Preload: API exposed successfully');
-} catch (error) {
-  console.error('Preload: Error exposing API:', error);
+// Create storage interface that uses the API
+const storage: StorageInterface = {
+  async loadFolders() {
+    const result = await api.invoke('load-folders');
+    return result.folders;
+  },
+  async saveFolders(folders) {
+    const result = await api.invoke('save-folders', { folders });
+    return result.folders;
+  }
+};
+
+// Expose both API and storage to renderer
+contextBridge.exposeInMainWorld('api', api);
+contextBridge.exposeInMainWorld('storage', storage);
+
+// Type declarations
+declare global {
+  interface Window {
+    api: typeof api;
+    storage: StorageInterface;
+  }
 }
 
 // Log that preload script is complete
